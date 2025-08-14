@@ -18,6 +18,7 @@ from html import unescape
 try:
     from bs4 import BeautifulSoup
 except ImportError:
+    import os
     try:
         os.system("opkg update")
         # pokušaj za python3, ako ne uspe probaj python2 paket
@@ -25,14 +26,21 @@ except ImportError:
             os.system("opkg install python-beautifulsoup4")
         from bs4 import BeautifulSoup
     except Exception as e:
-        print(f"[CiefpOscamEditor] Upozorenje: Modul 'bs4' nije dostupan ({e})")
+        try:
+            from Screens.MessageBox import MessageBox
+            session.open(MessageBox,
+                         "Nedostaje modul 'bs4' (BeautifulSoup4)\nMolimo instalirajte ga ručno:\n"
+                         "opkg update && opkg install python3-beautifulsoup4",
+                         MessageBox.TYPE_ERROR, timeout=10)
+        except:
+            print(f"[CiefpOscamEditor] Upozorenje: Modul 'bs4' nije dostupan ({e})")
         BeautifulSoup = None
 # --- Kraj provere bs4 ---
 
 from Screens.ChoiceBox import ChoiceBox
 
 
-PLUGIN_VERSION = "1.1.1"
+PLUGIN_VERSION = "1.1.2"
 # Konfiguracija za putanju i jezik
 config.plugins.CiefpOscamEditor = ConfigSubsection()
 config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
@@ -528,7 +536,9 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
 
     def addLine(self):
         line_type = self.line_type.value
-        caid = self.custom_caid.value.lower().replace("0x", "").upper() if self.caid.value == "" else self.caid.value.lower().replace("0x", "").upper()
+        caid = self.custom_caid.value.lower().replace("0x",
+                                                      "").upper() if self.caid.value == "" else self.caid.value.lower().replace(
+            "0x", "").upper()
         provider = self.provider.value.lower().replace("0x", "").upper()
         channel_specific = self.channel_specific.value == "yes"
         add_comment = self.add_comment.value == "yes"
@@ -541,12 +551,23 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
             if channel_specific and service_id:
                 line += f":{service_id:04X}"
         elif line_type == "A:":
-            ns = self.ns.value.lower().replace("0x", "").upper()
-            sid = self.sid.value.lower().replace("0x", "").upper()
-            ecmpid = self.ecmpid.value.lower().replace("0x", "").upper()
-            line = f"{line_type} {ns}:{sid}:{ecmpid} {caid}:{provider}:1FFF"
+            # Polja iz GUI-ja
+            ns = self.ns.value.strip().lower().replace("0x", "").upper()
+            sid = self.sid.value.strip().lower().replace("0x", "").upper()
+            ecmpid = self.ecmpid.value.strip().lower().replace("0x", "").upper()
+
+            # Ako je neko polje prazno, ostaje prazno, ali dvotačke se zadržavaju
+            # Format: A: ::SID:ECMPID:: CAID:PROVIDER:1FFF
+            ns_field = ns if ns else ""
+            sid_field = sid if sid else ""
+            ecmpid_field = ecmpid if ecmpid else ""
+
+            # Formiramo string sa praznim poljima ako nisu popunjena
+            line = f"{line_type} ::{sid_field}:{ecmpid_field}:: {caid}:{provider}:1FFF"
         elif line_type == "J:":
-            caid2 = self.custom_caid2.value.lower().replace("0x", "").upper() if self.caid2.value == "" else self.caid2.value.lower().replace("0x", "").upper()
+            caid2 = self.custom_caid2.value.lower().replace("0x",
+                                                            "").upper() if self.caid2.value == "" else self.caid2.value.lower().replace(
+                "0x", "").upper()
             provider2 = self.provider2.value.lower().replace("0x", "").upper()
             sid = self.sid.value.lower().replace("0x", "").upper()
             ecmpid = self.ecmpid.value.lower().replace("0x", "").upper()
@@ -554,7 +575,9 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
             line = f"{line_type} {caid}:{provider}:{sid}:{ecmpid} {caid2}:{provider2}:{ecmpid2}"
         elif line_type == "M:":
             stari_prov = self.stari_prov.value.lower().replace("0x", "").upper()
-            caid2 = self.custom_caid2.value.lower().replace("0x", "").upper() if self.caid2.value == "" else self.caid2.value.lower().replace("0x", "").upper()
+            caid2 = self.custom_caid2.value.lower().replace("0x",
+                                                            "").upper() if self.caid2.value == "" else self.caid2.value.lower().replace(
+                "0x", "").upper()
             novi_prov = self.novi_prov.value.lower().replace("0x", "").upper()
             sid = self.sid.value.lower().replace("0x", "").upper()
             sid2 = self.sid2.value.lower().replace("0x", "").upper()
@@ -573,10 +596,12 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
 
             with open(dvbapi_path, "a") as f:
                 f.write(line + "\n")
-            self.session.open(MessageBox, get_translation("line_added").format(dvbapi_path, line), MessageBox.TYPE_INFO, timeout=5)
+            self.session.open(MessageBox, get_translation("line_added").format(dvbapi_path, line), MessageBox.TYPE_INFO,
+                              timeout=5)
             self.close()
         except Exception as e:
-            self.session.open(MessageBox, get_translation("write_error").format(dvbapi_path, str(e)), MessageBox.TYPE_ERROR)
+            self.session.open(MessageBox, get_translation("write_error").format(dvbapi_path, str(e)),
+                              MessageBox.TYPE_ERROR)
 
     def openPreview(self):
         self.session.open(CiefpOscamEditorPreview)
