@@ -9,9 +9,15 @@ from Components.config import config, ConfigSubsection, ConfigSelection, ConfigT
 from Components.MenuList import MenuList
 from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox
 import os
+import re
+import requests
+import urllib.request
+from html import unescape
+from bs4 import BeautifulSoup
+from Screens.ChoiceBox import ChoiceBox
 
 
-PLUGIN_VERSION = "1.0"
+PLUGIN_VERSION = "1.1"
 # Konfiguracija za putanju i jezik
 config.plugins.CiefpOscamEditor = ConfigSubsection()
 config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
@@ -31,6 +37,7 @@ config.plugins.CiefpOscamEditor.language = ConfigSelection(
     ]
 )
 
+# Rečnik za prevode
 # Rečnik za prevode
 TRANSLATIONS = {
     "en": {
@@ -114,7 +121,26 @@ TRANSLATIONS = {
         "dvbapi_path": "Path to oscam.dvbapi",
         "language": "Language",
         "settings_saved": "Settings saved!",
-        "future_function": "Future functionality (placeholder)"
+        "future_function": "Future functionality (placeholder)",
+        "cccam_premium": "CCcam Premium",
+        "cccamia_free": "CCCamIA Free",
+        "cccamiptv_free": "CCcamIPTV Free",
+        "select_source": "Select FreeCCcam source",
+        "select_line": "Select C-line from {0}",
+        "no_lines_found": "No C-lines found on {0}",
+        "connection_error": "Connection error to {0}: {1}",
+        "reader_added_from": "Reader '{0}' added from {1}, Oscam reloaded",
+        "FreeCCcam": "FreeCCcam",
+        "select_source": "Select FreeCCcam source",
+        "select_line": "Select C-line from {0}",
+        "no_lines_found": "No C-lines found on {0}",
+        "connection_error": "Connection error to {0}: {1}",
+        "reader_added_from": "Reader '{0}' added from {1}, Oscam reloaded",
+        "cccam_premium": "CCcam Premium",
+        "cccamia_free": "CCCamIA Free",
+        "cccamiptv_free": "CCcamIPTV Free",
+        "invalid_c_line": "Invalid C-line format",
+        "parsing_error": "Error parsing C-line: {0}"
     },
     "sr": {
         "title_main": "..:: Ciefp Oscam Editor ::..",
@@ -197,7 +223,26 @@ TRANSLATIONS = {
         "dvbapi_path": "Putanja do oscam.dvbapi",
         "language": "Jezik",
         "settings_saved": "Podešavanja sačuvana!",
-        "future_function": "Buduća funkcionalnost (placeholder)"
+        "future_function": "Buduća funkcionalnost (placeholder)",
+        "cccam_premium": "CCcam Premium",
+        "cccamia_free": "CCCamIA Besplatno",
+        "cccamiptv_free": "CCcamIPTV Besplatno",
+        "select_source": "Izaberite izvor FreeCCcam linija",
+        "select_line": "Izaberite C liniju sa {0}",
+        "no_lines_found": "Nema dostupnih C linija na {0}",
+        "connection_error": "Greška pri povezivanju na {0}: {1}",
+        "reader_added_from": "Čitač '{0}' dodat iz {1}, Oscam ponovo pokrenut",
+        "FreeCCcam": "FreeCCcam",
+        "select_source": "Izaberite izvor FreeCCcam linija",
+        "select_line": "Izaberite C liniju sa {0}",
+        "no_lines_found": "Nema dostupnih C linija na {0}",
+        "connection_error": "Greška pri povezivanju na {0}: {1}",
+        "reader_added_from": "Čitač '{0}' dodat iz {1}, Oscam ponovo pokrenut",
+        "cccam_premium": "CCcam Premium",
+        "cccamia_free": "CCCamIA Besplatno",
+        "cccamiptv_free": "CCcamIPTV Besplatno",
+        "invalid_c_line": "Neispravan format C linije",
+        "parsing_error": "Greška pri parsiranju C linije: {0}"
     }
 }
 
@@ -207,13 +252,13 @@ def get_translation(key):
 
 class CiefpOscamEditorMain(Screen):
     skin = """
-    <screen name="CiefpOscamEditorMain" position="center,center" size="1200,600" title="..:: Ciefp Oscam Editor ::..">
-        <widget name="channel_info" position="10,10" size="780,550" font="Regular;26" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="310,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="460,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background.png" position="900,0" size="300,600" />
+    <screen name="CiefpOscamEditorMain" position="center,center" size="1400,800" title="..:: Ciefp Oscam Editor ::..">
+        <widget name="channel_info" position="10,10" size="980,650" font="Regular;26" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -336,13 +381,13 @@ class CiefpOscamEditorMain(Screen):
 
 class CiefpOscamEditorAdd(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamEditorAdd" position="center,center" size="1200,600" title="..:: Add dvbapi Line ::..">
-        <widget name="config" position="10,10" size="880,450" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="310,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="460,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background2.png" position="900,0" size="300,600" />
+    <screen name="CiefpOscamEditorAdd" position="center,center" size="1400,800" title="..:: Add dvbapi Line ::..">
+        <widget name="config" position="10,10" size="980,650" scrollbarMode="showOnDemand" itemHeight="40" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background2.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session, default_provider="000000"):
@@ -526,12 +571,12 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
 
 class CiefpOscamEditorPreview(Screen):
     skin = """
-    <screen name="CiefpOscamEditorPreview" position="center,center" size="1200,600" title="..:: oscam.dvbapi Preview ::..">
-        <widget name="file_list" position="10,10" size="880,540" font="Regular;24" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_blue" position="310,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="900,0" size="300,600" />
+    <screen name="CiefpOscamEditorPreview" position="center,center" size="1400,800" title="..:: oscam.dvbapi Preview ::..">
+        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_blue" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -614,13 +659,13 @@ class CiefpOscamEditorPreview(Screen):
 
 class CiefpOscamServerPreview(Screen):
     skin = """
-    <screen name="CiefpOscamServerPreview" position="center,center" size="1200,600" title="..:: oscam.server Preview ::..">
-        <widget name="file_list" position="10,10" size="880,540" font="Regular;22" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="310,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="460,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background4.png" position="900,0" size="300,600" />
+    <screen name="CiefpOscamServerPreview" position="center,center" size="1400,800" title="..:: oscam.server Preview ::..">
+        <widget name="file_list" position="10,10" size="980,740" font="Regular;22" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background4.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -630,13 +675,13 @@ class CiefpOscamServerPreview(Screen):
         self["file_list"] = MenuList([], enableWrapAround=True)
         self["file_list"].l.setItemHeight(26)
         self["key_red"] = Label(get_translation("exit"))
-        self["key_green"] = Label(get_translation("save"))
+        self["key_green"] = Label(get_translation("FreeCCcam"))
         self["key_yellow"] = Label(get_translation("add_reader"))
         self["key_blue"] = Label(get_translation("delete"))
         self["background"] = Pixmap()
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "red": self.close,
-            "green": self.saveFile,
+            "green": self.fetchFreeCCcam,
             "yellow": self.openAddReader,
             "blue": self.openReaderSelect,
             "cancel": self.close,
@@ -682,26 +727,250 @@ class CiefpOscamServerPreview(Screen):
             print(f"Updated lines in CiefpOscamServerPreview: {self.lines}")
             self["file_list"].setList(self.lines)
 
-    def saveFile(self):
-        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
-        server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
+    def fetch_cccamia_free_cccam():
+        url = "https://cccamia.com/cccam-free"
         try:
-            os.makedirs(os.path.dirname(server_path), exist_ok=True)
-            with open(server_path, "w", encoding="utf-8") as f:
-                for line in self.lines:
-                    f.write(line + "\n")
-            print(f"File saved: {server_path} with {len(self.lines)} lines")
-            self.session.open(MessageBox, get_translation("file_saved").format(server_path), MessageBox.TYPE_INFO, timeout=5)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                # Pronađite sve C linije na stranici - ovo zavisi od HTML strukture stranice
+                c_lines = []
+                # Pretpostavka da su C linije u <pre> tagu ili nekom sličnom elementu
+                for pre_tag in soup.find_all('pre'):
+                    text = pre_tag.get_text()
+                    # Pronađite sve C linije u tekstu
+                    matches = re.findall(r'C:\s*[\w\.-]+\s+\d+\s+\w+\s+[\w\.-]+', text)
+                    c_lines.extend(matches)
+                return c_lines
+            else:
+                print(f"Error: HTTP {response.status_code}")
+                return []
         except Exception as e:
-            print(f"Error saving file: {str(e)}")
-            self.session.open(MessageBox, get_translation("file_save_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
+            print(f"Error fetching from cccamia.com: {str(e)}")
+            return []
+
+    def fetchFreeCCcam(self):
+        def onSourceSelected(choice):
+            if choice is None:
+                return
+
+            selected_name = choice[0]  # Prikazano ime
+            selected_url = choice[1]  # URL
+
+            # Odredi label prema izvoru
+            if "cccam-premium.pro" in selected_url:
+                label_name = "FreeCCcam_Premium"
+            elif "cccamia.com" in selected_url:
+                label_name = "CCCamIA_Free"
+            elif "cccamiptv.tv" in selected_url:
+                label_name = "CCcamIPTV_Free"
+            else:
+                label_name = "FreeCCcam"
+
+            # Posebna obrada za CCCamIPTV Free
+            if "cccamiptv.tv" in selected_url:
+                try:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                        "Referer": "https://cccamiptv.tv/"
+                    }
+                    response = requests.get(selected_url, headers=headers, timeout=15)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'html.parser')
+                        c_lines = []
+
+                        # Parsiranje specifično za CCCamIPTV - tražimo u div-u sa id="page-content"
+                        content_div = soup.find('div', {'id': 'page-content'})
+                        if content_div:
+                            # Tražimo sve C linije u tekstu
+                            matches = re.findall(r'C:\s*[\w\.-]+\s+\d+\s+\w+\s+[\w\.-]+', content_div.get_text())
+                            c_lines.extend(matches)
+
+                        if not c_lines:
+                            self.session.open(MessageBox, get_translation("no_lines_found").format(get_translation("cccamiptv_free")), MessageBox.TYPE_ERROR, timeout=5)
+                            return
+
+                        # Pripremi listu za ChoiceBox
+                        choice_list = [(line, line) for line in c_lines]
+
+                        # Prikaži korisniku da izabere liniju
+                        self.session.openWithCallback(
+                            lambda selected_line: self.addCCcamReader(selected_line, label_name),
+                            ChoiceBox,
+                            title=f"Izaberite C liniju sa {selected_name}",
+                            list=choice_list
+                        )
+                    else:
+                        self.session.open(MessageBox, get_translation("connection_error").format(get_translation("cccamiptv_free"), f"HTTP {response.status_code}"), MessageBox.TYPE_ERROR, timeout=5)
+                except Exception as e:
+                    self.session.open(MessageBox, f"Greška pri dobijanju C linija sa CCCamIPTV Free: {str(e)}",
+                                      MessageBox.TYPE_ERROR, timeout=5)
+                return
+
+            # Posebna obrada za CCCamIA Free
+            if "cccamia.com" in selected_url:
+                try:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                    }
+                    response = requests.get(selected_url, headers=headers, timeout=10)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'html.parser')
+                        c_lines = []
+
+                        # Parsiranje specifično za CCCamIA Free
+                        for pre_tag in soup.find_all('pre'):
+                            text = pre_tag.get_text()
+                            matches = re.findall(r'C:\s*[\w\.-]+\s+\d+\s+\w+\s+[\w\.-]+', text)
+                            c_lines.extend(matches)
+
+                        if not c_lines:
+                            self.session.open(MessageBox, "Nema dostupnih C linija na CCCamIA Free!",
+                                              MessageBox.TYPE_ERROR, timeout=5)
+                            return
+
+                        # Pripremi listu za ChoiceBox
+                        choice_list = [(line, line) for line in c_lines]
+
+                        # Prikaži korisniku da izabere liniju
+                        self.session.openWithCallback(
+                            lambda selected_line: self.addCCcamReader(selected_line, label_name),
+                            ChoiceBox,
+                            title=f"Izaberite C liniju sa {selected_name}",
+                            list=choice_list
+                        )
+                    else:
+                        self.session.open(MessageBox, f"Greška pri pristupu CCCamIA Free: HTTP {response.status_code}",
+                                          MessageBox.TYPE_ERROR, timeout=5)
+                except Exception as e:
+                    self.session.open(MessageBox, f"Greška pri dobijanju C linija sa CCCamIA Free: {str(e)}",
+                                      MessageBox.TYPE_ERROR, timeout=5)
+                return
+
+            # Obrada za CCcam Premium
+            try:
+                html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
+
+                # Traži C: liniju
+                match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
+                if not match:
+                    self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
+                    return
+
+                server, port, user, password = match.groups()
+
+                # ukloni HTML tagove i dekodiraj entitete (ako postoje)
+                password = re.sub(r'<.*?>', '', password)
+                password = unescape(password).strip()
+
+                reader_lines = [
+                    "[reader]",
+                    f"label                         = {label_name}",
+                    "protocol                      = cccam",
+                    f"device                        = {server},{port}",
+                    f"user                          = {user}",
+                    f"password                      = {password}",
+                    "inactivitytimeout             = -1",
+                    "cacheex                       = 1",
+                    "group                         = 2",
+                    "emmcache                      = 1,3,2,0",
+                    "disablecrccws                 = 0",
+                    "disablecrccws_only_for        = 0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
+                    "cccversion                    = 2.0.11",
+                    "cccmaxhops                    = 2",
+                    "ccckeepalive                  = 1"
+                ]
+
+                dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+                server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
+
+                os.makedirs(os.path.dirname(server_path), exist_ok=True)
+                with open(server_path, "a", encoding="utf-8") as f:
+                    f.write("\n" + "\n".join(reader_lines) + "\n")
+
+                os.system("killall -HUP oscam")
+                self.session.open(
+                    MessageBox,
+                    f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
+                    MessageBox.TYPE_INFO,
+                    timeout=5
+                )
+
+            except Exception as e:
+                self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
+
+        # Lista izvora
+        choices = [
+            (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
+            (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
+            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content")
+        ]
+
+        self.session.openWithCallback(
+            onSourceSelected,
+            ChoiceBox,
+            title=get_translation("select_source"),
+            list=choices
+        )
+
+    def addCCcamReader(self, c_line, label_prefix):
+        if not c_line:
+            return
+
+        # Parsiraj C liniju
+        try:
+            # Proveri da li je c_line tuple (ako je došlo iz ChoiceBox-a)
+            if isinstance(c_line, tuple):
+                c_line = c_line[1]  # Uzmi stvarnu vrednost iz tuple-a
+
+            parts = c_line.split()
+            if len(parts) < 4:
+                raise ValueError(get_translation("invalid_c_line"))
+
+            server = parts[1]
+            port = parts[2]
+            user = parts[3]
+            password = parts[4] if len(parts) > 4 else "no_password"
+
+            reader_lines = [
+                "[reader]",
+                f"label                         = {label_prefix}_{user}",
+                "protocol                      = cccam",
+                f"device                        = {server},{port}",
+                f"user                          = {user}",
+                f"password                      = {password}",
+                "inactivitytimeout             = -1",
+                "cacheex                       = 1",
+                "group                         = 2",
+                "emmcache                      = 1,3,2,0",
+                "disablecrccws                 = 0",
+                "disablecrccws_only_for        = 0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
+                "cccversion                    = 2.0.11",
+                "cccmaxhops                    = 2",
+                "ccckeepalive                  = 1"
+            ]
+
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
+
+            os.makedirs(os.path.dirname(server_path), exist_ok=True)
+            with open(server_path, "a", encoding="utf-8") as f:
+                f.write("\n" + "\n".join(reader_lines) + "\n")
+
+            os.system("killall -HUP oscam")
+            self.session.open(MessageBox, get_translation("reader_added_from").format(f"{label_prefix}_{user}", get_translation("cccamiptv_free")), MessageBox.TYPE_INFO, timeout=5)
+        except Exception as e:
+            self.session.open(MessageBox, get_translation("parsing_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
 
 class CiefpOscamServerAdd(ConfigListScreen, Screen):
     skin = """
     <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Add Reader to oscam.server ::..">
         <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,750" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,750" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session):
@@ -826,10 +1095,10 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
 
 class CiefpOscamServerReaderSelect(Screen):
     skin = """
-    <screen name="CiefpOscamServerReaderSelect" position="center,center" size="800,600" title="..:: Select Reader to Delete ::..">
-        <widget name="reader_list" position="10,10" size="780,450" font="Regular;26" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+    <screen name="CiefpOscamServerReaderSelect" position="center,center" size="900,800" title="..:: Select Reader to Delete ::..">
+        <widget name="reader_list" position="10,10" size="880,650" font="Regular;26" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session, lines):
@@ -957,10 +1226,10 @@ class CiefpOscamServerReaderSelect(Screen):
 
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamEditorSettings" position="center,center" size="800,600" title="..:: Ciefp Oscam Editor Settings ::..">
-        <widget name="config" position="10,10" size="780,450" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="160,550" size="140,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+    <screen name="CiefpOscamEditorSettings" position="center,center" size="900,800" title="..:: Ciefp Oscam Editor Settings ::..">
+        <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="220,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session):
@@ -994,7 +1263,7 @@ def main(session, **kwargs):
 def Plugins(**kwargs):
     return [PluginDescriptor(
         name="Ciefp Oscam Editor",
-        description=f"Edit oscam.dvbapi,oscam.server from Enigma2 (Version {PLUGIN_VERSION})",
+        description=f"Edit Oscam files from Enigma2 (Version {PLUGIN_VERSION})",
         where=PluginDescriptor.WHERE_PLUGINMENU,
         icon="plugin.png",
         fnc=main
