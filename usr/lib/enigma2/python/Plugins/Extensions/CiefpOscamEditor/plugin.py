@@ -13,11 +13,26 @@ import re
 import requests
 import urllib.request
 from html import unescape
-from bs4 import BeautifulSoup
+
+# --- Provera i instalacija bs4 ---
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    try:
+        os.system("opkg update")
+        # pokušaj za python3, ako ne uspe probaj python2 paket
+        if os.system("opkg install python3-beautifulsoup4") != 0:
+            os.system("opkg install python-beautifulsoup4")
+        from bs4 import BeautifulSoup
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Upozorenje: Modul 'bs4' nije dostupan ({e})")
+        BeautifulSoup = None
+# --- Kraj provere bs4 ---
+
 from Screens.ChoiceBox import ChoiceBox
 
 
-PLUGIN_VERSION = "1.1"
+PLUGIN_VERSION = "1.1.1"
 # Konfiguracija za putanju i jezik
 config.plugins.CiefpOscamEditor = ConfigSubsection()
 config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
