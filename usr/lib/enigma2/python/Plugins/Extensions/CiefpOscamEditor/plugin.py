@@ -1,4 +1,9 @@
 from Plugins.Plugin import PluginDescriptor
+from Plugins.Extensions.CiefpOscamEditor.languages.en import translations as en_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.sr import translations as sr_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.el import translations as el_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.ar import translations as ar_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.de import translations as de_trans
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Components.Pixmap import Pixmap
@@ -13,6 +18,7 @@ import re
 import requests
 import urllib.request
 from html import unescape
+from enigma import eTimer
 
 # --- Provera i instalacija bs4 ---
 try:
@@ -38,9 +44,38 @@ except ImportError:
 # --- Kraj provere bs4 ---
 
 from Screens.ChoiceBox import ChoiceBox
+import urllib.request
+import subprocess
 
+VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
+UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
+PLUGIN_VERSION = "1.1.3"
 
-PLUGIN_VERSION = "1.1.2"
+def check_for_update(session):
+    try:
+        current_version = PLUGIN_VERSION
+        with urllib.request.urlopen(VERSION_URL, timeout=5) as f:
+            latest_version = f.read().decode("utf-8").strip()
+
+        if latest_version != current_version:
+            def onConfirmUpdate(answer):
+                if answer:
+                    session.open(MessageBox, get_translation("update_in_progress"), MessageBox.TYPE_INFO, timeout=5)
+                    subprocess.call(UPDATE_COMMAND, shell=True)
+                else:
+                    session.open(MessageBox, get_translation("update_cancelled"), MessageBox.TYPE_INFO, timeout=5)
+
+            session.openWithCallback(
+                onConfirmUpdate,
+                MessageBox,
+                f"{get_translation('new_version_available').format(latest_version)}\n"
+                f"{get_translation('current_version')}: {current_version}\n"
+                f"{get_translation('update_question')}",
+                MessageBox.TYPE_YESNO
+            )
+    except Exception as e:
+        session.open(MessageBox, get_translation("update_check_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
+
 # Konfiguracija za putanju i jezik
 config.plugins.CiefpOscamEditor = ConfigSubsection()
 config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
@@ -49,229 +84,40 @@ config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
         ("/etc/tuxbox/config/oscam.dvbapi", "Default"),
         ("/etc/tuxbox/config/oscam-emu/oscam.dvbapi", "Oscam-emu"),
         ("/etc/tuxbox/config/oscam-master/oscam.dvbapi", "Oscam-master"),
-        ("/etc/tuxbox/config/oscam-smod/oscam.dvbapi", "Oscam-smod")
+        ("/etc/tuxbox/config/oscam-smod/oscam.dvbapi", "Oscam-smod"),
+        ("/etc/tuxbox/config/oscamicamnew/oscam.dvbapi", "oscamicamnew")
     ]
 )
 config.plugins.CiefpOscamEditor.language = ConfigSelection(
     default="sr",
     choices=[
         ("en", "English"),
-        ("sr", "Srpski")
+        ("sr", "Srpski"),
+        ("el", "Greek"),
+        ("ar", "Arabic"),
+        ("de", "German")
     ]
 )
 
 # Rečnik za prevode
-# Rečnik za prevode
 TRANSLATIONS = {
-    "en": {
-        "title_main": "..:: Ciefp Oscam Editor ::..",
-        "exit": "Exit",
-        "add_dvbapi": "Add dvbapi",
-        "settings": "Settings",
-        "oscam_server": "oscam.server",
-        "no_channel_info": "No channel information available",
-        "channel": "Channel",
-        "service_id": "Service ID",
-        "caids": "CAIDs",
-        "ecm_pid": "ECM PID",
-        "provider": "Provider",
-        "chid": "CHID",
-        "reader": "Reader",
-        "from": "From",
-        "protocol": "Protocol",
-        "hops": "Hops",
-        "ecm_time": "ECM Time",
-        "title_add_dvbapi": "..:: Add dvbapi Line ::..",
-        "add": "Add",
-        "cancel": "Cancel",
-        "preview": "Preview",
-        "future": "Future",
-        "line_type": "Select line type",
-        "caid": "CAID",
-        "custom_caid": "Custom CAID",
-        "provider": "Provider",
-        "channel_specific": "Only for this channel",
-        "add_comment": "Add comment with channel name",
-        "ns": "NS",
-        "sid": "SID",
-        "ecmpid": "ECM PID",
-        "caid1": "CAID1",
-        "provider1": "Provider1",
-        "ecmpid1": "ECM PID1",
-        "caid2": "CAID2",
-        "custom_caid2": "Custom CAID2",
-        "provider2": "Provider2",
-        "ecmpid2": "ECM PID2",
-        "old_provider": "Old Provider",
-        "new_provider": "New Provider",
-        "sid2": "SID2",
-        "line_added": "Line added to {0}:\n{1}",
-        "write_error": "Error writing to {0}:\n{1}",
-        "title_preview": "..:: oscam.dvbapi Preview ::..",
-        "save": "Save",
-        "delete": "Delete",
-        "file_not_exist": "File oscam.dvbapi does not exist.",
-        "file_read_error": "Error reading file: {0}",
-        "no_line_selected": "No line selected!",
-        "delete_confirm": "Are you sure you want to delete the line:\n{0}",
-        "line_deleted": "Line deleted:\n{0}",
-        "file_saved": "File saved to {0}",
-        "file_save_error": "Error saving file:\n{0}",
-        "title_server_preview": "..:: oscam.server Preview ::..",
-        "add_reader": "Add reader",
-        "title_add_reader": "..:: Add Reader to oscam.server ::..",
-        "label": "Label",
-        "protocol": "Protocol",
-        "device": "Device (address,port)",
-        "user": "User",
-        "password": "Password",
-        "inactivity_timeout": "Inactivity Timeout",
-        "cacheex": "Cacheex",
-        "group": "Group",
-        "emm_cache": "EMM Cache",
-        "disable_crc_cws": "Disable CRC CWS",
-        "disable_crc_cws_only_for": "Disable CRC CWS Only For",
-        "ccc_version": "CCC Version",
-        "ccc_max_hops": "CCC Max Hops",
-        "ccc_keep_alive": "CCC Keep Alive",
-        "reader_added": "Reader added to {0}",
-        "reader_add_error": "Error adding reader:\n{0}",
-        "title_reader_select": "..:: Select Reader to Delete ::..",
-        "no_readers": "No readers in the file.",
-        "delete_reader_confirm": "Are you sure you want to delete reader '{0}'?",
-        "reader_deleted": "Reader '{0}' deleted.",
-        "title_settings": "..:: Ciefp Oscam Editor Settings ::..",
-        "dvbapi_path": "Path to oscam.dvbapi",
-        "language": "Language",
-        "settings_saved": "Settings saved!",
-        "future_function": "Future functionality (placeholder)",
-        "cccam_premium": "CCcam Premium",
-        "cccamia_free": "CCCamIA Free",
-        "cccamiptv_free": "CCcamIPTV Free",
-        "select_source": "Select FreeCCcam source",
-        "select_line": "Select C-line from {0}",
-        "no_lines_found": "No C-lines found on {0}",
-        "connection_error": "Connection error to {0}: {1}",
-        "reader_added_from": "Reader '{0}' added from {1}, Oscam reloaded",
-        "FreeCCcam": "FreeCCcam",
-        "select_source": "Select FreeCCcam source",
-        "select_line": "Select C-line from {0}",
-        "no_lines_found": "No C-lines found on {0}",
-        "connection_error": "Connection error to {0}: {1}",
-        "reader_added_from": "Reader '{0}' added from {1}, Oscam reloaded",
-        "cccam_premium": "CCcam Premium",
-        "cccamia_free": "CCCamIA Free",
-        "cccamiptv_free": "CCcamIPTV Free",
-        "invalid_c_line": "Invalid C-line format",
-        "parsing_error": "Error parsing C-line: {0}"
-    },
-    "sr": {
-        "title_main": "..:: Ciefp Oscam Editor ::..",
-        "exit": "Izlaz",
-        "add_dvbapi": "Dodaj dvbapi",
-        "settings": "Podešavanja",
-        "oscam_server": "oscam.server",
-        "no_channel_info": "Nema informacija o kanalu",
-        "channel": "Kanal",
-        "service_id": "ID servisa",
-        "caids": "CAID-ovi",
-        "ecm_pid": "ECM PID",
-        "provider": "Provajder",
-        "chid": "CHID",
-        "reader": "Čitač",
-        "from": "Od",
-        "protocol": "Protokol",
-        "hops": "Hops",
-        "ecm_time": "ECM Vreme",
-        "title_add_dvbapi": "..:: Dodaj dvbapi liniju ::..",
-        "add": "Dodaj",
-        "cancel": "Otkaži",
-        "preview": "Pregled",
-        "future": "Buduće",
-        "line_type": "Izaberi tip linije",
-        "caid": "CAID",
-        "custom_caid": "Prilagođeni CAID",
-        "provider": "Provajder",
-        "channel_specific": "Samo za ovaj kanal",
-        "add_comment": "Dodaj komentar sa imenom kanala",
-        "ns": "NS",
-        "sid": "SID",
-        "ecmpid": "ECM PID",
-        "caid1": "CAID1",
-        "provider1": "Provajder1",
-        "ecmpid1": "ECM PID1",
-        "caid2": "CAID2",
-        "custom_caid2": "Prilagođeni CAID2",
-        "provider2": "Provajder2",
-        "ecmpid2": "ECM PID2",
-        "old_provider": "Stari Provajder",
-        "new_provider": "Novi Provajder",
-        "sid2": "SID2",
-        "line_added": "Linija dodata u {0}:\n{1}",
-        "write_error": "Greška prilikom pisanja u {0}:\n{1}",
-        "title_preview": "..:: oscam.dvbapi Pregled ::..",
-        "save": "Sačuvaj",
-        "delete": "Obriši",
-        "file_not_exist": "Fajl oscam.dvbapi ne postoji.",
-        "file_read_error": "Greška prilikom čitanja fajla: {0}",
-        "no_line_selected": "Nijedna linija nije selektovana!",
-        "delete_confirm": "Da li ste sigurni da želite obrisati liniju:\n{0}",
-        "line_deleted": "Linija obrisana:\n{0}",
-        "file_saved": "Fajl sačuvan u {0}",
-        "file_save_error": "Greška prilikom čuvanja fajla:\n{0}",
-        "title_server_preview": "..:: oscam.server Pregled ::..",
-        "add_reader": "Dodaj čitač",
-        "title_add_reader": "..:: Dodaj čitač u oscam.server ::..",
-        "label": "Oznaka",
-        "protocol": "Protokol",
-        "device": "Uređaj (adresa,port)",
-        "user": "Korisnik",
-        "password": "Lozinka",
-        "inactivity_timeout": "Vreme neaktivnosti",
-        "cacheex": "Cacheex",
-        "group": "Grupa",
-        "emm_cache": "EMM Keš",
-        "disable_crc_cws": "Onemogući CRC CWS",
-        "disable_crc_cws_only_for": "Onemogući CRC CWS samo za",
-        "ccc_version": "CCC Verzija",
-        "ccc_max_hops": "CCC Maksimalni Hops",
-        "ccc_keep_alive": "CCC Održavaj aktivnim",
-        "reader_added": "Čitač dodat u {0}",
-        "reader_add_error": "Greška prilikom dodavanja čitača:\n{0}",
-        "title_reader_select": "..:: Izaberi čitač za brisanje ::..",
-        "no_readers": "Nema čitača u fajlu.",
-        "delete_reader_confirm": "Da li ste sigurni da želite obrisati čitač '{0}'?",
-        "reader_deleted": "Čitač '{0}' obrisan.",
-        "title_settings": "..:: Ciefp Oscam Editor Podešavanja ::..",
-        "dvbapi_path": "Putanja do oscam.dvbapi",
-        "language": "Jezik",
-        "settings_saved": "Podešavanja sačuvana!",
-        "future_function": "Buduća funkcionalnost (placeholder)",
-        "cccam_premium": "CCcam Premium",
-        "cccamia_free": "CCCamIA Besplatno",
-        "cccamiptv_free": "CCcamIPTV Besplatno",
-        "select_source": "Izaberite izvor FreeCCcam linija",
-        "select_line": "Izaberite C liniju sa {0}",
-        "no_lines_found": "Nema dostupnih C linija na {0}",
-        "connection_error": "Greška pri povezivanju na {0}: {1}",
-        "reader_added_from": "Čitač '{0}' dodat iz {1}, Oscam ponovo pokrenut",
-        "FreeCCcam": "FreeCCcam",
-        "select_source": "Izaberite izvor FreeCCcam linija",
-        "select_line": "Izaberite C liniju sa {0}",
-        "no_lines_found": "Nema dostupnih C linija na {0}",
-        "connection_error": "Greška pri povezivanju na {0}: {1}",
-        "reader_added_from": "Čitač '{0}' dodat iz {1}, Oscam ponovo pokrenut",
-        "cccam_premium": "CCcam Premium",
-        "cccamia_free": "CCCamIA Besplatno",
-        "cccamiptv_free": "CCcamIPTV Besplatno",
-        "invalid_c_line": "Neispravan format C linije",
-        "parsing_error": "Greška pri parsiranju C linije: {0}"
-    }
+    "en": en_trans,
+    "sr": sr_trans,
+    "el": el_trans,
+    "ar": ar_trans,
+    "de": de_trans
 }
 
 def get_translation(key):
     lang = config.plugins.CiefpOscamEditor.language.value
-    return TRANSLATIONS.get(lang, TRANSLATIONS["en"]).get(key, key)
+    # prvo pokušaj odabrani jezik
+    if lang in TRANSLATIONS and key in TRANSLATIONS[lang]:
+        return TRANSLATIONS[lang][key]
+    # ako nema, probaj engleski
+    if key in TRANSLATIONS["en"]:
+        return TRANSLATIONS["en"][key]
+    # ako nema ni u engleskom, vrati sam ključ
+    return key
 
 class CiefpOscamEditorMain(Screen):
     skin = """
@@ -303,6 +149,11 @@ class CiefpOscamEditorMain(Screen):
         }, -2)
         self.current_provider_id = "000000"
         self.updateChannelInfo()
+
+        # Odložena provera verzije da bi se ekran prvo inicijalizovao
+        self.updateTimer = eTimer()
+        self.updateTimer.callback.append(lambda: check_for_update(self.session))
+        self.updateTimer.start(500, True)  # pokreni za 0.5 sekundi
 
     def get_ecm_info(self):
         ecm_path = "/tmp/ecm.info"
