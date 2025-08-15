@@ -98,7 +98,7 @@ translations = {
     "cccamia_free": "CCCamIA Besplatno",
     "cccamiptv_free": "CCcamIPTV Besplatno",
     "invalid_c_line": "Neispravan format C linije",
-    "parsing_error": "Greška pri parsiranju C linije: {0}"
+    "parsing_error": "Greška pri parsiranju C linije: {0}",
     "new_version_available": "Dostupna je nova verzija: {}",
     "current_version": "Trenutna verzija",
     "update_question": "Želite li da ažurirate plugin?",
