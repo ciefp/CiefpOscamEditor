@@ -98,5 +98,11 @@ translations = {
     "cccamia_free": "CCCamIA Free",
     "cccamiptv_free": "CCcamIPTV Free",
     "invalid_c_line": "Μη έγκυρη μορφή C-line",
-    "parsing_error": "Σφάλμα ανάλυσης C-line: {0}"
+    "parsing_error": "Σφάλμα ανάλυσης C-line: {0}",
+    "new_version_available": "Μια νέα έκδοση είναι διαθέσιμη: {}",
+    "current_version": "Τρέχουσα έκδοση",
+    "update_question": "Θέλετε να ενημερώσετε το πρόσθετο;",
+    "update_in_progress": "Θέλετε να ενημερώσετε το πρόσθετο;",
+    "update_cancelled": "Η ενημέρωση ακυρώθηκε.",
+    "update_check_error": "Σφάλμα ελέγχου αναβάθμισης: {}"
 }

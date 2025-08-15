@@ -86,5 +86,15 @@ translations = {
     "select_source": "اختر مصدر اسطر سيسكام مجانيه",
     "select_line": "اختر سطر C من {0}",
     "no_lines_found": "لم يتم العثور على أسطر C على {0}",
-    "connection_error": "خطأ بالأتصال"
+    "connection_error": "خطأ بالأتصال",
+    "reader_added_from": "تمت إضافة القارئ '{0}' من {1}، وأُعيد تحميل Oscam",
+    "FreeCCcam": "FreeCCcam",
+    "invalid_c_line": "تنسيق سطر C غير صالح",
+    "parsing_error": "خطأ في تحليل سطر C: {0}",
+    "new_version_available": "يوجد إصدار جديد متاح: {}",
+    "current_version": "الإصدار الحالي",
+    "update_question": "هل ترغب في تحديث الإضافة؟",
+    "update_in_progress": "هل ترغب في تحديث الإضافة؟",
+    "update_cancelled": "تم إلغاء التحديث.",
+    "update_check_error": "خطأ في التحقق من التحديث: {}"
 }

@@ -98,5 +98,12 @@ translations = {
     "cccamia_free": "CCCamIA Free",
     "cccamiptv_free": "CCcamIPTV Free",
     "invalid_c_line": "Invalid C-line format",
-    "parsing_error": "Error parsing C-line: {0}"
+    "parsing_error": "Error parsing C-line: {0}",
+    "new_version_available": "A new version is available: {}",
+    "current_version": "Current version",
+    "update_question": "Do you want to update the plugin?",
+    "update_in_progress": "Updating...",
+    "update_cancelled": "Update canceled.",
+    "no_update_available": "You already have the latest version.",
+    "update_check_error": "Error checking upgrade: {}"
 }
