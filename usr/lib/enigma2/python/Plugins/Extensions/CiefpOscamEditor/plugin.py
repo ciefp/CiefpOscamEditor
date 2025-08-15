@@ -650,7 +650,7 @@ class CiefpOscamServerPreview(Screen):
         <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
         <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background4.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
