@@ -1,3 +1,8 @@
+import requests
+import json
+import re
+import os
+from requests.auth import HTTPBasicAuth
 from Plugins.Plugin import PluginDescriptor
 from Plugins.Extensions.CiefpOscamEditor.languages.en import translations as en_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.sr import translations as sr_trans
@@ -9,80 +14,22 @@ from Plugins.Extensions.CiefpOscamEditor.languages.pl import translations as pl_
 from Plugins.Extensions.CiefpOscamEditor.languages.tr import translations as tr_trans
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
+from Screens.ChoiceBox import ChoiceBox
 from Components.Pixmap import Pixmap
 from Components.ActionMap import ActionMap
 from Components.Label import Label
 from Components.ConfigList import ConfigListScreen
 from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, getConfigListEntry
 from Components.MenuList import MenuList
-from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox
-import os
-import re
-import requests
+from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox, eTimer
 import urllib.request
+import urllib.error
+import base64
+import xml.etree.ElementTree as ET
 from html import unescape
-from enigma import eTimer
-
-# --- Provera i instalacija bs4 ---
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    import os
-    try:
-        os.system("opkg update")
-        if os.system("opkg install python3-beautifulsoup4") != 0:
-            os.system("opkg install python-beautifulsoup4")
-        from bs4 import BeautifulSoup
-    except Exception as e:
-        try:
-            from Screens.MessageBox import MessageBox
-            session.open(MessageBox,
-                         "Nedostaje modul 'bs4' (BeautifulSoup4)\nMolimo instalirajte ga ručno:\n"
-                         "opkg update && opkg install python3-beautifulsoup4",
-                         MessageBox.TYPE_ERROR, timeout=10)
-        except:
-            print(f"[CiefpOscamEditor] Upozorenje: Modul 'bs4' nije dostupan ({e})")
-        BeautifulSoup = None
-# --- Kraj provere bs4 ---
-
-from Screens.ChoiceBox import ChoiceBox
-import urllib.request
 import subprocess
 
-# Konfiguracija za putanju, jezik i automatsko prepoznavanje verzije
-config.plugins.CiefpOscamEditor = ConfigSubsection()
-config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
-    default="/etc/tuxbox/config/oscam.dvbapi",
-    choices=[
-        ("/etc/tuxbox/config/oscam.dvbapi", "Default"),
-        ("/etc/tuxbox/config/oscam-emu/oscam.dvbapi", "Oscam-emu"),
-        ("/etc/tuxbox/config/oscam-master/oscam.dvbapi", "Oscam-master"),
-        ("/etc/tuxbox/config/oscam-smod/oscam.dvbapi", "Oscam-smod"),
-        ("/etc/tuxbox/config/oscamicamnew/oscam.dvbapi", "oscamicamnew")
-    ]
-)
-config.plugins.CiefpOscamEditor.language = ConfigSelection(
-    default="sr",
-    choices=[
-        ("en", "English"),
-        ("sr", "Srpski"),
-        ("el", "Greek"),
-        ("ar", "Arabic"),
-        ("de", "German"),
-        ("sk", "Slovak"),
-        ("pl", "Polish"),
-        ("tr", "Turkish")
-    ]
-)
-config.plugins.CiefpOscamEditor.auto_version_path = ConfigSelection(
-    default="yes",
-    choices=[
-        ("yes", "Yes"),
-        ("no", "No")
-    ]
-)
-
-# Rečnik za prevode
+# Postojeći kod za prevode
 TRANSLATIONS = {
     "en": en_trans,
     "sr": sr_trans,
@@ -102,9 +49,54 @@ def get_translation(key):
         return TRANSLATIONS["en"][key]
     return key
 
+# Konfiguracija (nakon get_translation)
+config.plugins.CiefpOscamEditor = ConfigSubsection()
+config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
+    default="/etc/tuxbox/config/oscam.dvbapi",
+    choices=[
+        ("/etc/tuxbox/config/oscam.dvbapi", "Default"),
+        ("/etc/tuxbox/config/oscam-emu/oscam.dvbapi", "Oscam-emu"),
+        ("/etc/tuxbox/config/oscam-master/oscam.dvbapi", "Oscam-master"),
+        ("/etc/tuxbox/config/oscam-smod/oscam.dvbapi", "Oscam-smod"),
+        ("/etc/tuxbox/config/oscamicamnew/oscam.dvbapi", "oscamicamnew")
+    ]
+)
+
+config.plugins.CiefpOscamEditor.language = ConfigSelection(
+    default="en",
+    choices=[
+        ("en", "English"),
+        ("sr", "Srpski"),
+        ("el", "Greek"),
+        ("ar", "Arabic"),
+        ("de", "German"),
+        ("sk", "Slovak"),
+        ("pl", "Polish"),
+        ("tr", "Turkish")
+    ]
+)
+config.plugins.CiefpOscamEditor.auto_version_path = ConfigSelection(
+    default="yes",
+    choices=[
+        ("yes", "Yes"),
+        ("no", "No")
+    ]
+)
+
+config.plugins.CiefpOscamEditor.webif_ip = ConfigText(default="127.0.0.1", fixed_size=False)
+config.plugins.CiefpOscamEditor.webif_user = ConfigText(default="", fixed_size=False)
+config.plugins.CiefpOscamEditor.webif_password = ConfigText(default="", fixed_size=False)
+config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", choices=[
+    ("5", get_translation("5_seconds")),
+    ("10", get_translation("10_seconds")),
+    ("30", get_translation("30_seconds")),
+    ("60", get_translation("60_seconds"))
+])
+
+# Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.1.4"
+PLUGIN_VERSION = "1.1.5"
 
 def check_for_update(session):
     try:
@@ -139,7 +131,7 @@ def get_oscam_info():
         "start_time": "Unknown",
         "box_type": "Unknown",
         "config_dir": "Unknown",
-        "webif_port": "Unknown",
+        "webif_port": "8888",
         "features": [],
         "protocols": [],
         "readers": []
@@ -176,6 +168,219 @@ def get_oscam_info():
         except Exception as e:
             print(f"[CiefpOscamEditor] Error reading oscam.version: {str(e)}")
     return oscam_info
+
+# Ažurirana funkcija read_oscam_conf
+oscam_regex = {
+    'httpport': re.compile(r'httpport\s*=\s*(?P<httpport>[+]?\d+)'),
+    'httpuser': re.compile(r'httpuser\s*=\s*(?P<httpuser>.*)'),
+    'httppwd': re.compile(r'httppwd\s*=\s*(?P<httppwd>.*)'),
+}
+
+def read_oscam_conf():
+    conf = {
+        "ip": config.plugins.CiefpOscamEditor.webif_ip.value,
+        "port": config.plugins.CiefpOscamEditor.webif_port.value if hasattr(config.plugins.CiefpOscamEditor, 'webif_port') else "8888",
+        "user": config.plugins.CiefpOscamEditor.webif_user.value,
+        "pwd": config.plugins.CiefpOscamEditor.webif_password.value
+    }
+    # Dobij ConfigDir iz get_oscam_info
+    oscam_info = get_oscam_info()
+    config_dir = oscam_info.get("config_dir", "Unknown")
+    webif_port = oscam_info.get("webif_port", "8888")
+
+    possible_paths = [
+        "/etc/tuxbox/config/oscam-emu/oscam.conf",
+        os.path.join(config_dir, "oscam.conf") if config_dir != "Unknown" else None,
+        "/etc/tuxbox/config/oscam.conf",
+        "/etc/tuxbox/config/oscam-master/oscam.conf",
+        "/etc/tuxbox/config/oscam-smod/oscam.conf",
+        "/usr/local/etc/oscam.conf"
+    ]
+    possible_paths = [p for p in possible_paths if p]
+
+    for conf_path in possible_paths:
+        if os.path.isfile(conf_path):
+            print(f"[CiefpOscamEditor] Pronađen oscam.conf: {conf_path}")
+            try:
+                with open(conf_path, "r") as f:
+                    for line in f:
+                        for key, rx in oscam_regex.items():
+                            match = rx.search(line)
+                            if match:
+                                if key == "httpport":
+                                    port = match.group("httpport")
+                                    conf["port"] = port[1:] if port.startswith("+") else port
+                                elif key == "httpuser":
+                                    conf["user"] = match.group("httpuser").strip()
+                                elif key == "httppwd":
+                                    conf["pwd"] = match.group("httppwd").strip()
+                if webif_port != "Unknown":
+                    conf["port"] = webif_port
+                return conf
+            except Exception as e:
+                print(f"[CiefpOscamEditor] Greška pri čitanju oscam.conf ({conf_path}): {e}")
+    print(f"[CiefpOscamEditor] oscam.conf nije pronađen, koristim podrazumevane vrednosti")
+    return conf
+
+def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
+    """
+    Dohvata OSCam čitače preko WebIf-a koristeći XML sa ?part=status.
+    Radi sa tvojom verzijom OSCam-a 2.25.05.
+    Prikazuje sve čitače (type='r', 'p') i koristi ispravne metode za status, au, idle.
+    """
+    status_data = []
+    url = f"http://{ip}:{port}/oscamapi.html?part=status"
+    print(f"[CiefpOscamEditor] Pokušavam XML sa URL: {url}")
+
+    try:
+        request = urllib.request.Request(url)
+        if user and pwd:
+            auth_string = f"{user}:{pwd}"
+            auth_encoded = base64.b64encode(auth_string.encode()).decode()
+            request.add_header("Authorization", f"Basic {auth_encoded}")
+
+        with urllib.request.urlopen(request, timeout=5) as response:
+            xml_data = response.read().decode("utf-8")
+            print(f"[CiefpOscamEditor] Sirovi XML odgovor: {xml_data[:500]}...")
+
+            try:
+                root = ET.fromstring(xml_data)
+                # Traži sve <client> koji su čitači ili proxy (type='r' ili 'p')
+                for client in root.findall(".//client[@type='r']") + root.findall(".//client[@type='p']"):
+                    name = client.get("name", "Unknown")
+                    protocol = client.get("protocol", "Unknown")
+                    # Ukloni verziju iz protokola ako postoji
+                    if " (" in protocol:
+                        protocol = protocol.split(" (")[0]
+
+                    # Status je sadržaj <connection> taga
+                    connection = client.find("connection")
+                    status = connection.text.strip() if connection is not None and connection.text else "Unknown"
+
+                    # AU je atribut
+                    au = client.get("au", "0")
+
+                    # Idle vreme je u <times idle="...">, ali u tvojoj verziji ga nema
+                    # Koristi idle iz atributa <times> ako postoji, inače "0"
+                    times = client.find("times")
+                    idle = times.get("idle", "0") if times is not None else "0"
+
+                    # Dodaj tip za jasnoću (opciono)
+                    client_type = client.get("type", "Unknown")
+                    display_name = f"{name} ({client_type})"
+
+                    status_data.append({
+                        "name": display_name,
+                        "status": status,
+                        "au": au,
+                        "idle": idle,
+                        "protocol": protocol
+                    })
+
+                print(f"[CiefpOscamEditor] XML uspešno parsiran, pronađeno {len(status_data)} čitača")
+                return status_data
+
+            except ET.ParseError as e:
+                print(f"[CiefpOscamEditor] XML parsiranje nije uspelo: {e}")
+                print(f"[CiefpOscamEditor] Celokupni XML odgovor: {xml_data}")
+
+    except urllib.error.HTTPError as e:
+        print(f"[CiefpOscamEditor] HTTP greška: {e.code} - {e.reason}")
+    except urllib.error.URLError as e:
+        print(f"[CiefpOscamEditor] Mrežna greška: {e.reason}")
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Neočekivana greška: {e}")
+
+    print("[CiefpOscamEditor] Nema dostupnih čitača")
+    return []
+
+
+# Ažurirana klasa CiefpOscamStatus
+class CiefpOscamStatus(Screen):
+    skin = """<screen name="CiefpOscamStatus" position="center,center" size="1400,800" title="..:: OSCam Status ::..">
+        <widget name="status_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background6.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        self.session = session
+        self.is_refreshing = True
+        self["status_list"] = MenuList([], enableWrapAround=True)
+        self["status_list"].l.setItemHeight(30)
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("refresh"))
+        self["key_yellow"] = Label(get_translation("ecm_info"))
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+            "red": self.close,
+            "green": self.refreshStatus,
+            "yellow": self.openEcmInfo,
+            "cancel": self.close
+        }, -2)
+        self.timer = eTimer()
+        self.timer.callback.append(self.refreshStatus)
+        self.interval = int(config.plugins.CiefpOscamEditor.refresh_interval.value) * 1000
+        self.timer.start(self.interval, False)
+        self.refreshStatus()
+
+    def toggleRefresh(self):
+        if self.is_refreshing:
+            self.timer.stop()
+            self.is_refreshing = False
+            self["key_green"].setText(get_translation("start_refresh"))
+        else:
+            self.timer.start(self.interval, False)
+            self.is_refreshing = True
+            self["key_green"].setText(get_translation("refresh"))
+        self.refreshStatus()
+
+    def refreshStatus(self):
+        status_data = []
+        try:
+            # Čitaj config iz oscam.conf bez prosleđivanja putanje
+            conf = read_oscam_conf()
+            print(f"[CiefpOscamStatus] Konfiguracija: IP={conf['ip']}, Port={conf['port']}, User={conf['user']}")
+
+            # Dohvati čitače
+            readers = get_oscam_readers(
+                ip=conf["ip"],
+                port=conf["port"],
+                user=conf["user"],
+                pwd=conf["pwd"]
+            )
+
+            if readers:
+                for reader in readers:
+                    status_data.append(
+                        f"{get_translation('reader')}: {reader['name']} | "
+                        f"{get_translation('status')}: {reader['status']} | "
+                        f"{get_translation('au')}: {reader['au']} | "
+                        f"{get_translation('idle_time')}: {reader['idle']} | "
+                        f"{get_translation('protocol')}: {reader['protocol']}"
+                    )
+            else:
+                status_data.append(get_translation("no_status_data"))
+                print("[CiefpOscamStatus] Nema čitača ili greška u komunikaciji")
+
+        except Exception as e:
+            status_data.append(get_translation("connection_error").format(f"{str(e)}"))
+            print(f"[CiefpOscamStatus] Error: {str(e)}")
+
+        self["status_list"].setList(status_data)
+
+    def openEcmInfo(self):
+        self.session.open(CiefpOscamEcmInfo)
+
+    def close(self):
+        self.timer.stop()
+        Screen.close(self)
+
+# Ostale klase (CiefpOscamEditorMain, CiefpOscamInfo, itd.) ostaju nepromenjene
+# ... (dodaj ostatak originalnog koda ovde)
 
 class CiefpOscamEditorMain(Screen):
     skin = """
@@ -327,24 +532,29 @@ class CiefpOscamInfo(Screen):
     <screen name="CiefpOscamInfo" position="center,center" size="1400,800" title="..:: OSCam Info ::..">
         <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background5.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
         Screen.__init__(self, session)
         self.session = session
-        self.setTitle(get_translation("oscam_info"))
         self["info_list"] = MenuList([], enableWrapAround=True)
         self["info_list"].l.setItemHeight(30)
         self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("status"))
         self["background"] = Pixmap()
         self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
             "red": self.close,
+            "green": self.openStatus,
             "cancel": self.close,
             "up": self.moveUp,
             "down": self.moveDown
         }, -2)
         self.displayOscamInfo()
+
+    def openStatus(self):
+        self.session.open(CiefpOscamStatus)
 
     def displayOscamInfo(self):
         oscam_info = get_oscam_info()
@@ -392,7 +602,7 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
         self["key_green"] = Label(get_translation("add"))
         self["key_red"] = Label(get_translation("cancel"))
         self["key_yellow"] = Label(get_translation("preview"))
-        self["key_blue"] = Label(get_translation("oscam_info"))
+        self["key_blue"] = Label(get_translation("oscam_info_button"))
         self["background"] = Pixmap()
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "green": self.addLine,
@@ -650,7 +860,7 @@ class CiefpOscamServerPreview(Screen):
         <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
         <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background4.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -702,71 +912,6 @@ class CiefpOscamServerPreview(Screen):
                 return
             selected_url, selected_name = selected[1], selected[0]
             label_name = selected_name.replace(" ", "_").lower()
-
-            if "cccamiptv.tv" in selected_url:
-                try:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                        "Referer": "https://cccamiptv.tv/"
-                    }
-                    response = requests.get(selected_url, headers=headers, timeout=15)
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        c_lines = []
-
-                        content_div = soup.find('div', {'id': 'page-content'})
-                        if content_div:
-                            matches = re.findall(r'C:\s*[\w\.-]+\s+\d+\s+\w+\s+[\w\.-]+', content_div.get_text())
-                            c_lines.extend(matches)
-
-                        if not c_lines:
-                            self.session.open(MessageBox, get_translation("no_lines_found").format(get_translation("cccamiptv_free")), MessageBox.TYPE_ERROR, timeout=5)
-                            return
-
-                        choice_list = [(line, line) for line in c_lines]
-                        self.session.openWithCallback(
-                            lambda selected_line: self.addCCcamReader(selected_line, label_name),
-                            ChoiceBox,
-                            title=f"Izaberite C liniju sa {selected_name}",
-                            list=choice_list
-                        )
-                    else:
-                        self.session.open(MessageBox, get_translation("connection_error").format(get_translation("cccamiptv_free"), f"HTTP {response.status_code}"), MessageBox.TYPE_ERROR, timeout=5)
-                except Exception as e:
-                    self.session.open(MessageBox, f"Greška pri dobijanju C linija sa CCCamIPTV Free: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
-                return
-
-            if "cccamia.com" in selected_url:
-                try:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                    }
-                    response = requests.get(selected_url, headers=headers, timeout=10)
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        c_lines = []
-
-                        for pre_tag in soup.find_all('pre'):
-                            text = pre_tag.get_text()
-                            matches = re.findall(r'C:\s*[\w\.-]+\s+\d+\s+\w+\s+[\w\.-]+', text)
-                            c_lines.extend(matches)
-
-                        if not c_lines:
-                            self.session.open(MessageBox, "Nema dostupnih C linija na CCCamIA Free!", MessageBox.TYPE_ERROR, timeout=5)
-                            return
-
-                        choice_list = [(line, line) for line in c_lines]
-                        self.session.openWithCallback(
-                            lambda selected_line: self.addCCcamReader(selected_line, label_name),
-                            ChoiceBox,
-                            title=f"Izaberite C liniju sa {selected_name}",
-                            list=choice_list
-                        )
-                    else:
-                        self.session.open(MessageBox, f"Greška pri pristupu CCCamIA Free: HTTP {response.status_code}", MessageBox.TYPE_ERROR, timeout=5)
-                except Exception as e:
-                    self.session.open(MessageBox, f"Greška pri dobijanju C linija sa CCCamIA Free: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
-                return
 
             try:
                 html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
@@ -828,53 +973,6 @@ class CiefpOscamServerPreview(Screen):
             list=choices
         )
 
-    def addCCcamReader(self, c_line, label_prefix):
-        if not c_line:
-            return
-
-        try:
-            if isinstance(c_line, tuple):
-                c_line = c_line[1]
-
-            parts = c_line.split()
-            if len(parts) < 4:
-                raise ValueError(get_translation("invalid_c_line"))
-
-            server = parts[1]
-            port = parts[2]
-            user = parts[3]
-            password = parts[4] if len(parts) > 4 else "no_password"
-
-            reader_lines = [
-                "[reader]",
-                f"label                         = {label_prefix}_{user}",
-                "protocol                      = cccam",
-                f"device                        = {server},{port}",
-                f"user                          = {user}",
-                f"password                      = {password}",
-                "inactivitytimeout             = -1",
-                "cacheex                       = 1",
-                "group                         = 2",
-                "emmcache                      = 1,3,2,0",
-                "disablecrccws                 = 0",
-                "disablecrccws_only_for        = 0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
-                "cccversion                    = 2.0.11",
-                "cccmaxhops                    = 2",
-                "ccckeepalive                  = 1"
-            ]
-
-            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
-            server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
-
-            os.makedirs(os.path.dirname(server_path), exist_ok=True)
-            with open(server_path, "a", encoding="utf-8") as f:
-                f.write("\n" + "\n".join(reader_lines) + "\n")
-
-            os.system("killall -HUP oscam")
-            self.session.open(MessageBox, get_translation("reader_added_from").format(f"{label_prefix}_{user}", get_translation("cccamiptv_free")), MessageBox.TYPE_INFO, timeout=5)
-        except Exception as e:
-            self.session.open(MessageBox, get_translation("parsing_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
-
     def updateLines(self, updated_lines):
         if updated_lines:
             self.lines = updated_lines
@@ -888,7 +986,7 @@ class CiefpOscamServerPreview(Screen):
 
 class CiefpOscamServerAdd(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Add Reader to oscam.server ::..">
+    <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Dodaj čitač u oscam.server ::..">
         <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
         <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
@@ -1144,7 +1242,7 @@ class CiefpOscamServerReaderSelect(Screen):
     def closeWithCallback(self):
         print("DEBUG: closeWithCallback called")
         self.close(self.lines)
-
+        
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
     <screen name="CiefpOscamEditorSettings" position="center,center" size="900,800" title="..:: Ciefp Oscam Editor Settings ::..">
@@ -1168,7 +1266,11 @@ class CiefpOscamEditorSettings(ConfigListScreen, Screen):
         self.list = [
             getConfigListEntry(get_translation("dvbapi_path") + ":", config.plugins.CiefpOscamEditor.dvbapi_path),
             getConfigListEntry(get_translation("language") + ":", config.plugins.CiefpOscamEditor.language),
-            getConfigListEntry(get_translation("auto_version_detection") + ":", config.plugins.CiefpOscamEditor.auto_version_path)
+            getConfigListEntry(get_translation("auto_version_detection") + ":", config.plugins.CiefpOscamEditor.auto_version_path),
+            getConfigListEntry(get_translation("webif_ip") + ":", config.plugins.CiefpOscamEditor.webif_ip),
+            getConfigListEntry(get_translation("webif_user") + ":", config.plugins.CiefpOscamEditor.webif_user),
+            getConfigListEntry(get_translation("webif_password") + ":", config.plugins.CiefpOscamEditor.webif_password),
+            getConfigListEntry(get_translation("refresh_interval") + ":", config.plugins.CiefpOscamEditor.refresh_interval)
         ]
         self["config"].list = self.list
         self["config"].l.setList(self.list)
@@ -1177,8 +1279,92 @@ class CiefpOscamEditorSettings(ConfigListScreen, Screen):
         config.plugins.CiefpOscamEditor.dvbapi_path.save()
         config.plugins.CiefpOscamEditor.language.save()
         config.plugins.CiefpOscamEditor.auto_version_path.save()
+        config.plugins.CiefpOscamEditor.webif_ip.save()
+        config.plugins.CiefpOscamEditor.webif_user.save()
+        config.plugins.CiefpOscamEditor.webif_password.save()
+        config.plugins.CiefpOscamEditor.refresh_interval.save()
         self.session.open(MessageBox, get_translation("settings_saved"), MessageBox.TYPE_INFO, timeout=5)
         self.close()
+        
+class CiefpOscamEcmInfo(Screen):
+    skin = """
+    <screen name="CiefpOscamEcmInfo" position="center,center" size="1400,800" title="..:: ECM Info ::..">
+        <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background7.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        self.session = session
+        self["info_list"] = MenuList([], enableWrapAround=True)
+        self["info_list"].l.setItemHeight(30)
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("refresh"))
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+            "red": self.close,
+            "green": self.refresh,
+            "cancel": self.close
+        }, -2)
+        self.refresh()
+
+    def refresh(self):
+        info = self.get_ecm_info()
+        info_lines = [
+            f"{get_translation('caid')}: {info['caid']}",
+            f"{get_translation('pid')}: {info['pid']}",
+            f"{get_translation('prov')}: {info['prov']}",
+            f"{get_translation('chid')}: {info['chid']}",
+            f"{get_translation('reader')}: {info['reader']}",
+            f"{get_translation('from')}: {info['from']}",
+            f"{get_translation('protocol')}: {info['protocol']}",
+            f"{get_translation('hops')}: {info['hops']}",
+            f"{get_translation('ecm_time')}: {info['ecm_time']}"
+        ]
+        self["info_list"].setList(info_lines)
+
+    def get_ecm_info(self):
+        ecm_path = "/tmp/ecm.info"
+        info = {
+            "caid": "N/A",
+            "pid": "N/A",
+            "prov": "000000",
+            "chid": "N/A",
+            "reader": "N/A",
+            "from": "N/A",
+            "protocol": "N/A",
+            "hops": "N/A",
+            "ecm_time": "N/A"
+        }
+        if os.path.exists(ecm_path):
+            try:
+                with open(ecm_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.lower().startswith("caid:"):
+                            caid = line.split(":", 1)[1].strip().replace("0x", "").upper()
+                            info["caid"] = caid
+                        elif line.lower().startswith("pid:"):
+                            info["pid"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("prov:"):
+                            info["prov"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("chid:"):
+                            info["chid"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("reader:"):
+                            info["reader"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("from:"):
+                            info["from"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("protocol:"):
+                            info["protocol"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("hops:"):
+                            info["hops"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("ecm time:"):
+                            info["ecm_time"] = line.split(":", 1)[1].strip()
+            except Exception as e:
+                print(f"[CiefpOscamEditor] Greška pri čitanju ecm.info: {str(e)}")
+        return info
 
 def main(session, **kwargs):
     session.open(CiefpOscamEditorMain)
