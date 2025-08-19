@@ -5,13 +5,16 @@ import os
 from requests.auth import HTTPBasicAuth
 from Plugins.Plugin import PluginDescriptor
 from Plugins.Extensions.CiefpOscamEditor.languages.en import translations as en_trans
-from Plugins.Extensions.CiefpOscamEditor.languages.sr import translations as sr_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.sr_latn import translations as sr_latn_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.sr_cyrl import translations as sr_cyrl_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.hr import translations as hr_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.sk import translations as sk_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.el import translations as el_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.ar import translations as ar_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.de import translations as de_trans
-from Plugins.Extensions.CiefpOscamEditor.languages.sk import translations as sk_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.pl import translations as pl_trans
 from Plugins.Extensions.CiefpOscamEditor.languages.tr import translations as tr_trans
+from Plugins.Extensions.CiefpOscamEditor.languages.es import translations as es_trans
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Screens.ChoiceBox import ChoiceBox
@@ -19,7 +22,7 @@ from Components.Pixmap import Pixmap
 from Components.ActionMap import ActionMap
 from Components.Label import Label
 from Components.ConfigList import ConfigListScreen
-from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, getConfigListEntry
+from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry
 from Components.MenuList import MenuList
 from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox, eTimer
 import urllib.request
@@ -32,13 +35,16 @@ import subprocess
 # Postojeći kod za prevode
 TRANSLATIONS = {
     "en": en_trans,
-    "sr": sr_trans,
+    "sr_latn": sr_latn_trans,
+    "sr_cyrl": sr_cyrl_trans,
+    "hr": hr_trans,
+    "sk": sk_trans,
     "el": el_trans,
     "ar": ar_trans,
     "de": de_trans,
-    "sk": sk_trans,
     "pl": pl_trans,
-    "tr": tr_trans
+    "tr": tr_trans,
+    "es": es_trans
 }
 
 def get_translation(key):
@@ -66,13 +72,16 @@ config.plugins.CiefpOscamEditor.language = ConfigSelection(
     default="en",
     choices=[
         ("en", "English"),
-        ("sr", "Srpski"),
+        ("sr_latn", "Srpski (latinica)"),
+        ("sr_cyrl", "Српски (ћирилица)"),
+        ("hr", "Hrvatki"),
+        ("sk", "Slovak"),
         ("el", "Greek"),
         ("ar", "Arabic"),
         ("de", "German"),
-        ("sk", "Slovak"),
         ("pl", "Polish"),
-        ("tr", "Turkish")
+        ("tr", "Turkish"),
+        ("es", "Spain")
     ]
 )
 config.plugins.CiefpOscamEditor.auto_version_path = ConfigSelection(
@@ -96,7 +105,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.1.5"
+PLUGIN_VERSION = "1.1.6"
 
 def check_for_update(session):
     try:
@@ -299,9 +308,9 @@ def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
 class CiefpOscamStatus(Screen):
     skin = """<screen name="CiefpOscamStatus" position="center,center" size="1400,800" title="..:: OSCam Status ::..">
         <widget name="status_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background6.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -379,17 +388,371 @@ class CiefpOscamStatus(Screen):
         self.timer.stop()
         Screen.close(self)
 
-# Ostale klase (CiefpOscamEditorMain, CiefpOscamInfo, itd.) ostaju nepromenjene
-# ... (dodaj ostatak originalnog koda ovde)
+
+class CiefpOscamConfPreview(Screen):
+    skin = """<screen name="CiefpOscamConfPreview" position="center,center" size="1400,800" title="..:: oscam.conf Preview ::..">
+        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background9.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session, filepath):
+        Screen.__init__(self, session)
+        self.filepath = filepath
+        self.setTitle(get_translation("title_oscam_conf_preview"))
+        self["file_list"] = MenuList([], enableWrapAround=True)
+        self["file_list"].l.setItemHeight(30)
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("edit"))  # opcionalno
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+            "red": self.close,
+            "green": self.editFile,
+            "cancel": self.close
+        }, -2)
+        self.loadFile()
+
+    def loadFile(self):
+        try:
+            if os.path.exists(self.filepath):
+                with open(self.filepath, "r") as f:
+                    lines = [line.rstrip() for line in f if line.strip()]
+                self["file_list"].setList(lines)
+            else:
+                self["file_list"].setList([get_translation("file_not_exist")])
+        except Exception as e:
+            self["file_list"].setList([get_translation("file_read_error").format(str(e))])
+
+    def editFile(self):
+        # Kasnije možeš dodati uređivanje
+        pass
+
+class CiefpOscamConfEditor(Screen, ConfigListScreen):
+    skin = """<screen name="CiefpOscamConfEditor" position="center,center" size="1400,800" title="..:: OSCam Conf ::..">
+        <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background8.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        ConfigListScreen.__init__(self, [])
+        self.session = session
+        self.setTitle(get_translation("title_oscam_conf"))
+        self._rebuild_pending = False
+
+        # --- [global] ---
+        self.disablelog = ConfigSelection(default="1", choices=[("1", get_translation("on")), ("0", get_translation("off"))])
+        self.logfile = ConfigText(default="/dev/tty", fixed_size=False)
+        self.clienttimeout = ConfigText(default="5000", fixed_size=False)
+        self.clientmaxidle = ConfigText(default="180", fixed_size=False)
+        self.netprio = ConfigText(default="1", fixed_size=False)
+        self.nice = ConfigText(default="-1", fixed_size=False)
+        self.maxlogsize = ConfigText(default="1000", fixed_size=False)
+        self.waitforcards = ConfigSelection(default="0", choices=[("0", "0"), ("1", "1")])
+        self.preferlocalcards = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.dropdups = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.disablecrccws_only_for = ConfigText(
+            default="0E00:000000 1811:003311,023311,003315,003341,00331B,000007,000107;0500:030B00,032830,041950,042800,042820,050F00;1817:000000,00006A;1818:000000,00006C,000007;1819:00006D,000007;098C:000000;09C4:000000;098D:000000;0E00:000000;1830:000000;1810:000000",
+            fixed_size=False
+        )
+        self.cccam_cfg_reconnect_delay = ConfigText(default="90", fixed_size=False)
+        self.cccam_cfg_reconnect_attempts = ConfigText(default="6", fixed_size=False)
+        self.cccam_cfg_save = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+
+        # --- [streamrelay] ---
+        self.stream_relay_buffer_opt = ConfigSelection(default="0", choices=[("0", "0"), ("1", "1")])
+        self.stream_relay_buffer_time = ConfigText(default="600", fixed_size=False)
+        self.stream_relay_ctab = ConfigText(default="09C4,098C,098D", fixed_size=False)
+        self.stream_ecm_delay = ConfigText(default="0", fixed_size=False)
+
+        # --- [dvbapi] ---
+        self.dvbapi_au = ConfigSelection(default="1", choices=[("1", get_translation("on")), ("0", get_translation("off"))])
+        self.dvbapi_pmt_mode = ConfigSelection(default="0", choices=[("0", "0"), ("1", "1"), ("2", "2")])
+        self.dvbapi_request_mode = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.dvbapi_delayer = ConfigText(default="60", fixed_size=False)
+        self.dvbapi_user = ConfigText(default="dvbapiau", fixed_size=False)
+        self.dvbapi_read_sdt = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.dvbapi_write_sdt_prov = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.dvbapi_extended_cw_api = ConfigSelection(default="2", choices=[("0", "0"), ("1", "1"), ("2", "2")])
+        self.dvbapi_boxtype = ConfigSelection(default="vuplus", choices=[
+            ("dreambox", "dreambox"), ("vuplus", "vuplus"), ("zgemma", "zgemma"),
+            ("octagon", "octagon"), ("abpuls", "abpuls"), ("ipbox", "ipbox")
+        ])
+
+        # --- [webif] ---
+        self.httpport = ConfigText(default="8888", fixed_size=False)
+        self.httpshowmeminfo = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.httpshowuserinfo = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.httpshowcacheexinfo = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.httpshowecminfo = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.httpshowloadinfo = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.httpallowed = ConfigText(default="127.0.0.1,192.1.0.0-192.168.255.255", fixed_size=False)
+        self.httpuser_enabled = ConfigSelection(default="0", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+        self.httpuser = ConfigText(default="", fixed_size=False)
+        self.httppwd = ConfigText(default="", fixed_size=False)
+
+        # --- [newcamd] ---
+        self.newcamd_enabled = ConfigSelection(default="0", choices=[("1", get_translation("on")), ("0", get_translation("off"))])
+        self.newcamd_port = ConfigText(default="15001@0963:000000", fixed_size=False)
+        self.newcamd_key = ConfigText(default="0123456789ABCDEF0123456789ABCDEF", fixed_size=False)
+        self.newcamd_allowed = ConfigText(default="0.0.0.0-255.255.255.255", fixed_size=False)
+
+        # --- [cccam] ---
+        self.cccam_enabled = ConfigSelection(default="0", choices=[("1", get_translation("on")), ("0", get_translation("off"))])
+        self.cccam_port = ConfigText(default="16001", fixed_size=False)
+        self.cccam_version = ConfigText(default="2.3.0", fixed_size=False)
+        self.cccam_reshare = ConfigText(default="1", fixed_size=False)
+
+        # GUI
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("preview"))
+        self["key_blue"] = Label(get_translation("oscam_user"))
+        self["background"] = Pixmap()  
+        self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
+            "red": self.close,
+            "green": self.saveConfig,
+            "yellow": self.previewFile,
+            "blue": self.openUserEditor,
+            "cancel": self.close,
+            "up": self.moveUp,
+            "down": self.moveDown
+        }, -2)
+
+        self.createSetup()
+        self["config"].onSelectionChanged.append(self.onSelectionChanged)
+
+    def onSelectionChanged(self):
+        current = self["config"].getCurrent()
+        if not current:
+            return
+
+        # Proveri da li je trenutni unos "enable" tipa
+        key = current[0].lower()
+        if not any(x in key for x in ["on", "off", "enable", "auth", "newcamd", "cccam"]):
+            return
+
+        # Ako je vrednost već obrađena, izbegni rekurziju
+        if hasattr(self, "_rebuild_pending") and self._rebuild_pending:
+            return
+
+        try:
+            self._rebuild_pending = True
+            self["config"].blockInputHelpers = True  # Blokira eventove
+            self.createSetup()
+        finally:
+            self._rebuild_pending = False
+            self["config"].blockInputHelpers = False
+
+    def createSetup(self):
+        self.list = []
+
+        # === [global] ===
+        self.list.append(getConfigListEntry("=== [global] ===", ConfigText(default="", fixed_size=True)))
+        self.list.extend([
+            getConfigListEntry(get_translation("disablelog"), self.disablelog),
+            getConfigListEntry(get_translation("logfile"), self.logfile),
+            getConfigListEntry(get_translation("clienttimeout"), self.clienttimeout),
+            getConfigListEntry(get_translation("clientmaxidle"), self.clientmaxidle),
+            getConfigListEntry(get_translation("netprio"), self.netprio),
+            getConfigListEntry(get_translation("nice"), self.nice),
+            getConfigListEntry(get_translation("maxlogsize"), self.maxlogsize),
+            getConfigListEntry(get_translation("waitforcards"), self.waitforcards),
+            getConfigListEntry(get_translation("preferlocalcards"), self.preferlocalcards),
+            getConfigListEntry(get_translation("dropdups"), self.dropdups),
+            getConfigListEntry(get_translation("disablecrccws_only_for"), self.disablecrccws_only_for),
+            getConfigListEntry(get_translation("cccam_cfg_reconnect_delay"), self.cccam_cfg_reconnect_delay),
+            getConfigListEntry(get_translation("cccam_cfg_reconnect_attempts"), self.cccam_cfg_reconnect_attempts),
+            getConfigListEntry(get_translation("cccam_cfg_save"), self.cccam_cfg_save),
+        ])
+
+        # === [streamrelay] ===
+        self.list.append(getConfigListEntry("=== [streamrelay] ===", ConfigText(default="", fixed_size=True)))
+        self.list.extend([
+            getConfigListEntry("stream_relay_enabled = 1", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("stream_relay_buffer_opt"), self.stream_relay_buffer_opt),
+            getConfigListEntry(get_translation("stream_relay_buffer_time"), self.stream_relay_buffer_time),
+            getConfigListEntry(get_translation("stream_relay_ctab"), self.stream_relay_ctab),
+            getConfigListEntry(get_translation("stream_ecm_delay"), self.stream_ecm_delay),
+        ])
+
+        # === [dvbapi] ===
+        self.list.append(getConfigListEntry("=== [dvbapi] ===", ConfigText(default="", fixed_size=True)))
+        self.list.extend([
+            getConfigListEntry("enabled = 1", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("au"), self.dvbapi_au),
+            getConfigListEntry(get_translation("pmt_mode"), self.dvbapi_pmt_mode),
+            getConfigListEntry(get_translation("request_mode"), self.dvbapi_request_mode),
+            getConfigListEntry(get_translation("delayer"), self.dvbapi_delayer),
+            getConfigListEntry(get_translation("user"), self.dvbapi_user),
+            getConfigListEntry(get_translation("read_sdt"), self.dvbapi_read_sdt),
+            getConfigListEntry(get_translation("write_sdt_prov"), self.dvbapi_write_sdt_prov),
+            getConfigListEntry(get_translation("extended_cw_api"), self.dvbapi_extended_cw_api),
+            getConfigListEntry(get_translation("boxtype"), self.dvbapi_boxtype),
+        ])
+
+        # === [webif] ===
+        self.list.append(getConfigListEntry("=== [webif] ===", ConfigText(default="", fixed_size=True)))
+        self.list.extend([
+            getConfigListEntry(get_translation("httpport"), self.httpport),
+            getConfigListEntry(get_translation("httpshowmeminfo"), self.httpshowmeminfo),
+            getConfigListEntry(get_translation("httpshowuserinfo"), self.httpshowuserinfo),
+            getConfigListEntry(get_translation("httpshowcacheexinfo"), self.httpshowcacheexinfo),
+            getConfigListEntry(get_translation("httpshowecminfo"), self.httpshowecminfo),
+            getConfigListEntry(get_translation("httpshowloadinfo"), self.httpshowloadinfo),
+            getConfigListEntry(get_translation("httpallowed"), self.httpallowed),
+            getConfigListEntry(get_translation("enable_http_auth"), self.httpuser_enabled),
+        ])
+        if self.httpuser_enabled.value == "1":
+            self.list.extend([
+                getConfigListEntry(get_translation("httpuser"), self.httpuser),
+                getConfigListEntry(get_translation("httppwd"), self.httppwd),
+            ])
+
+        # === [newcamd] ===
+        self.list.append(getConfigListEntry("=== [newcamd] ===", self.newcamd_enabled))
+        if self.newcamd_enabled.value == "1":
+            self.list.extend([
+                getConfigListEntry(get_translation("port"), self.newcamd_port),
+                getConfigListEntry(get_translation("key"), self.newcamd_key),
+                getConfigListEntry(get_translation("allowed"), self.newcamd_allowed),
+            ])
+
+        # === [cccam] ===
+        self.list.append(getConfigListEntry("=== [cccam] ===", self.cccam_enabled))
+        if self.cccam_enabled.value == "1":
+            self.list.extend([
+                getConfigListEntry(get_translation("port"), self.cccam_port),
+                getConfigListEntry(get_translation("version"), self.cccam_version),
+                getConfigListEntry(get_translation("reshare"), self.cccam_reshare),
+            ])
+
+        self["config"].list = self.list
+        self["config"].l.setList(self.list)
+
+    def saveConfig(self):
+        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+        conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
+
+        try:
+            lines = []
+
+            if not os.path.exists(conf_path):
+                lines.append("## Created by CiefpOscamEditor ##")
+                lines.append("## ..:: CiefpSettings ::.. ##")
+                lines.append("")
+
+            # [global]
+            lines.append("[global]")
+            lines.append(f"disablelog                    = {self.disablelog.value}")
+            lines.append(f"logfile                       = {self.logfile.value}")
+            lines.append(f"clienttimeout                 = {self.clienttimeout.value}")
+            lines.append(f"clientmaxidle                 = {self.clientmaxidle.value}")
+            lines.append(f"netprio                       = {self.netprio.value}")
+            lines.append(f"nice                          = {self.nice.value}")
+            lines.append(f"maxlogsize                    = {self.maxlogsize.value}")
+            lines.append(f"waitforcards                  = {self.waitforcards.value}")
+            lines.append(f"preferlocalcards              = {self.preferlocalcards.value}")
+            lines.append(f"dropdups                      = {self.dropdups.value}")
+            lines.append(f"disablecrccws_only_for        = {self.disablecrccws_only_for.value}")
+            lines.append(f"cccam_cfg_reconnect_delay     = {self.cccam_cfg_reconnect_delay.value}")
+            lines.append(f"cccam_cfg_reconnect_attempts  = {self.cccam_cfg_reconnect_attempts.value}")
+            lines.append(f"cccam_cfg_save                = {self.cccam_cfg_save.value}")
+            lines.append("")
+
+            # [streamrelay]
+            lines.append("[streamrelay]")
+            lines.append("stream_relay_enabled          = 1")
+            lines.append(f"stream_relay_buffer_opt       = {self.stream_relay_buffer_opt.value}")
+            lines.append(f"stream_relay_buffer_time      = {self.stream_relay_buffer_time.value}")
+            lines.append(f"stream_relay_ctab             = {self.stream_relay_ctab.value}")
+            lines.append(f"stream_ecm_delay              = {self.stream_ecm_delay.value}")
+            lines.append("")
+
+            # [dvbapi]
+            lines.append("[dvbapi]")
+            lines.append("enabled                       = 1")
+            lines.append(f"au                            = {self.dvbapi_au.value}")
+            lines.append(f"pmt_mode                      = {self.dvbapi_pmt_mode.value}")
+            lines.append(f"request_mode                  = {self.dvbapi_request_mode.value}")
+            lines.append(f"delayer                       = {self.dvbapi_delayer.value}")
+            lines.append(f"user                          = {self.dvbapi_user.value}")
+            lines.append(f"read_sdt                      = {self.dvbapi_read_sdt.value}")
+            lines.append(f"write_sdt_prov                = {self.dvbapi_write_sdt_prov.value}")
+            lines.append(f"extended_cw_api               = {self.dvbapi_extended_cw_api.value}")
+            lines.append(f"boxtype                       = {self.dvbapi_boxtype.value}")
+            lines.append("")
+
+            # [webif]
+            lines.append("[webif]")
+            lines.append(f"httpport                      = {self.httpport.value}")
+            lines.append(f"httpshowmeminfo               = {self.httpshowmeminfo.value}")
+            lines.append(f"httpshowuserinfo              = {self.httpshowuserinfo.value}")
+            lines.append(f"httpshowcacheexinfo           = {self.httpshowcacheexinfo.value}")
+            lines.append(f"httpshowecminfo               = {self.httpshowecminfo.value}")
+            lines.append(f"httpshowloadinfo              = {self.httpshowloadinfo.value}")
+            lines.append(f"httpallowed                   = {self.httpallowed.value}")
+            if self.httpuser_enabled.value == "1":
+                lines.append(f"httpuser                      = {self.httpuser.value}")
+                lines.append(f"httppwd                       = {self.httppwd.value}")
+            lines.append("")
+
+            # [newcamd]
+            if self.newcamd_enabled.value == "1":
+                lines.append("[newcamd]")
+                lines.append(f"port                          = {self.newcamd_port.value}")
+                lines.append(f"key                           = {self.newcamd_key.value}")
+                lines.append(f"allowed                       = {self.newcamd_allowed.value}")
+                lines.append("")
+
+            # [cccam]
+            if self.cccam_enabled.value == "1":
+                lines.append("[cccam]")
+                lines.append(f"port                          = {self.cccam_port.value}")
+                lines.append(f"version                       = {self.cccam_version.value}")
+                lines.append(f"reshare                       = {self.cccam_reshare.value}")
+                lines.append("")
+
+            # Snimi fajl
+            os.makedirs(os.path.dirname(conf_path), exist_ok=True)
+            with open(conf_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+
+            self.session.open(MessageBox, get_translation("conf_saved").format(conf_path), MessageBox.TYPE_INFO, timeout=5)
+
+        except Exception as e:
+            self.session.open(MessageBox, get_translation("write_error").format(conf_path, str(e)), MessageBox.TYPE_ERROR)
+    
+    def openUserEditor(self):
+        self.session.open(CiefpOscamUserEditor)        
+
+    def previewFile(self):
+        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+        conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
+        self.session.open(CiefpOscamConfPreview, conf_path)
+
+    def resetToDefault(self):
+        self.session.open(MessageBox, get_translation("reset_not_impl"), MessageBox.TYPE_INFO, timeout=5)
+
+    def moveUp(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveUp)
+
+    def moveDown(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveDown)
 
 class CiefpOscamEditorMain(Screen):
     skin = """
     <screen name="CiefpOscamEditorMain" position="center,center" size="1400,800" title="..:: Ciefp Oscam Editor ::..">
         <widget name="channel_info" position="10,10" size="980,650" font="Regular;26" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -401,14 +764,18 @@ class CiefpOscamEditorMain(Screen):
         self["channel_info"] = Label()
         self["key_green"] = Label(get_translation("add_dvbapi"))
         self["key_yellow"] = Label(get_translation("settings"))
-        self["key_red"] = Label(get_translation("exit"))
+        self["key_red"] = Label(get_translation("oscam_conf"))  # Bivši "Exit", sada "oscam.conf"
         self["key_blue"] = Label(get_translation("oscam_server"))
         self["background"] = Pixmap()
-        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+        self["actions"] = ActionMap(["ColorActions"], {
+            "red": self.openOscamConfEditor,  # Samo crveno dugme
             "green": self.openAddDvbapi,
             "yellow": self.openSettings,
-            "red": self.close,
-            "blue": self.openServerPreview,
+            "blue": self.openServerPreview
+        }, -2)
+
+        # Dodaj poseban ActionMap za "cancel"
+        self["cancel_action"] = ActionMap(["SetupActions"], {
             "cancel": self.close
         }, -2)
         self.current_provider_id = "000000"
@@ -419,7 +786,8 @@ class CiefpOscamEditorMain(Screen):
         self.updateTimer.callback.append(lambda: check_for_update(self.session))
         self.updateTimer.start(500, True)
 
-        # Dinamički podešavanje dvbapi_path na osnovu ConfigDir
+
+        # Automatsko podešavanje putanje
         if config.plugins.CiefpOscamEditor.auto_version_path.value == "yes" and oscam_info["config_dir"] != "Unknown":
             config_dir = oscam_info["config_dir"]
             if config_dir.endswith("/"):
@@ -518,6 +886,13 @@ class CiefpOscamEditorMain(Screen):
         else:
             self["channel_info"].setText(get_translation("no_channel_info"))
 
+    def openOscamConfEditor(self):
+        try:
+            self.session.open(CiefpOscamConfEditor)
+        except Exception as e:
+            from Screens.MessageBox import MessageBox
+            self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=10)
+    
     def openAddDvbapi(self):
         self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
 
@@ -531,8 +906,8 @@ class CiefpOscamInfo(Screen):
     skin = """
     <screen name="CiefpOscamInfo" position="center,center" size="1400,800" title="..:: OSCam Info ::..">
         <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background5.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -587,10 +962,10 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
     skin = """
     <screen name="CiefpOscamEditorAdd" position="center,center" size="1400,800" title="..:: Add dvbapi Line ::..">
         <widget name="config" position="10,10" size="980,650" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background2.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -779,9 +1154,9 @@ class CiefpOscamEditorPreview(Screen):
     skin = """
     <screen name="CiefpOscamEditorPreview" position="center,center" size="1400,800" title="..:: oscam.dvbapi Preview ::..">
         <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_blue" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_blue" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -856,10 +1231,10 @@ class CiefpOscamServerPreview(Screen):
     skin = """
     <screen name="CiefpOscamServerPreview" position="center,center" size="1400,800" title="..:: oscam.server Pregled ::..">
         <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="430,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
-        <widget name="key_blue" position="640,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -983,13 +1358,182 @@ class CiefpOscamServerPreview(Screen):
 
     def moveDown(self):
         self["file_list"].down()
+        
+class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
+    skin = """
+    <screen name="CiefpOscamEmulatorAdd" position="center,center" size="900,800" title="..:: Dodaj emulator čitač  ::..">
+        <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08500" foregroundColor="#000000" />
+    </screen>"""
 
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        ConfigListScreen.__init__(self, [])
+        self.session = session
+        self.setTitle(get_translation("title_add_emulator"))
+        
+        # Dugmici
+        self["key_red"] = Label(get_translation("cancel"))
+        self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("key_source"))
+        
+        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+            "red": self.close,
+            "green": self.save,
+            "yellow": self.changeKeySource,
+            "cancel": self.close
+        }, -2)
+
+        # Konfiguracione varijable za Emulator
+        self.label = ConfigText(default="emulator", fixed_size=False)
+        self.enable = ConfigSelection(default="1", choices=[("1", get_translation("enabled")), ("0", get_translation("disabled"))])
+        self.key_source = ConfigSelection(default="online", choices=[
+            ("online", get_translation("online_source")),
+            ("local", get_translation("local_source"))
+        ])
+        self.caid = ConfigText(default="0500,0E00,1010,2600", fixed_size=False)
+        self.ident = ConfigText(default="0500:021110;0E00:000000;1010:000000;2600:000000", fixed_size=False)
+        self.group = ConfigSelection(default="1", choices=[str(i) for i in range(1, 11)])
+        self.emmcache = ConfigSelection(default="2,1,2,1", choices=["2,1,2,1", "1,3,2,0", "1,5,2,0"])
+        self.emu_auproviders = ConfigText(default="0E00:000000;1010:000000", fixed_size=False)
+        self.detect = ConfigSelection(default="cd", choices=[("cd", "cd"), ("ff", "ff")])
+
+        # Parametri za ConstantCW reader (sakriveni ako je isključen)
+        self.enable_constantcw = ConfigYesNo(default=False)
+        self.constantcw_label = ConfigText(default="myconstantcw", fixed_size=False)
+        self.constantcw_path = ConfigText(default="/etc/tuxbox/config/oscam-emu/constant.cw", fixed_size=False)
+        self.constantcw_caid = ConfigText(default="0D00,0D02,090F,0500,1801,0604,2600,FFFF,0E00,4AE1,1010", fixed_size=False)
+        self.constantcw_group = ConfigSelection(default="2", choices=[str(i) for i in range(1, 11)])
+
+        # Postavi notifier za dinamičko ažuriranje
+        self.enable_constantcw.addNotifier(self.configChanged)
+        self.createSetup()
+
+    def configChanged(self, configElement):
+        """Callback kada se promeni enable_constantcw"""
+        self.createSetup()
+
+    def createSetup(self):
+        self.list = [
+            getConfigListEntry("=== Emulator Reader ===", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("label") + ":", self.label),
+            getConfigListEntry(get_translation("enable") + ":", self.enable),
+            getConfigListEntry(get_translation("key_source") + ":", self.key_source),
+            getConfigListEntry(get_translation("caid") + ":", self.caid),
+            getConfigListEntry(get_translation("ident") + ":", self.ident),
+            getConfigListEntry(get_translation("detect") + ":", self.detect),
+            getConfigListEntry(get_translation("group") + ":", self.group),
+            getConfigListEntry(get_translation("emmcache") + ":", self.emmcache),
+            getConfigListEntry(get_translation("emu_auproviders") + ":", self.emu_auproviders),
+            
+            getConfigListEntry("=== ConstantCW Reader ===", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("enable_constantcw") + ":", self.enable_constantcw)
+        ]
+
+        # Prikaži ConstantCW opcije samo ako je omogućen
+        if self.enable_constantcw.value:
+            self.list.extend([
+                getConfigListEntry(get_translation("label") + ":", self.constantcw_label),
+                getConfigListEntry(get_translation("constantcw_path") + ":", self.constantcw_path),
+                getConfigListEntry(get_translation("caid") + ":", self.constantcw_caid),
+                getConfigListEntry(get_translation("group") + ":", self.constantcw_group)
+            ])
+
+        self["config"].list = self.list
+    
+
+    def changeKeySource(self):
+        self.key_source.value = "online" if self.key_source.value == "local" else "local"
+        self.createSetup()
+
+    def save(self):
+        reader_lines = []
+
+        # Emulator reader
+        if self.enable.value == "1":
+            # Get the correct SoftCam.Key path based on oscam version
+            oscam_info = get_oscam_info()
+            config_dir = oscam_info.get("config_dir", "/etc/tuxbox/config")
+
+            # Determine the correct SoftCam.Key path
+            if "oscam-emu" in config_dir:
+                softcam_path = f"{config_dir}/SoftCam.Key"
+            elif "oscam-master" in config_dir:
+                softcam_path = f"{config_dir}/SoftCam.Key"
+            elif "oscam-smod" in config_dir:
+                softcam_path = f"{config_dir}/SoftCam.Key"
+            else:
+                softcam_path = f"{config_dir}/SoftCam.Key"
+
+            online_url = "https://raw.githubusercontent.com/MOHAMED19OS/SoftCam_Emu/main/SoftCam.Key"
+
+            reader_lines.extend([
+                "[reader]",
+                f"label                         = {self.label.value}",
+                f"enable                        = {self.enable.value}",
+                f"protocol                      = emu",
+                f"device                        = emulator"
+            ])
+
+            # Add device line for key source
+            if self.key_source.value == "online":
+                reader_lines.append(f"device                        = {online_url}  # online softcamkey")
+            else:
+                reader_lines.append(f"device                        = {softcam_path}  # lokalni softcamkey")
+
+            reader_lines.extend([
+                f"caid                          = {self.caid.value}",
+                f"detect                        = {self.detect.value}",
+                f"ident                         = {self.ident.value}",
+                f"group                         = {self.group.value}",
+                f"emmcache                      = {self.emmcache.value}",
+                f"emu_auproviders               = {self.emu_auproviders.value}",
+                ""  # Prazan red na kraju reader-a
+            ])
+
+        # ConstantCW reader (samo ako je omogućen)
+        if self.enable_constantcw.value:
+            reader_lines.extend([
+                "[reader]",
+                f"label                         = {self.constantcw_label.value}",
+                f"protocol                      = constcw",
+                f"device                        = {self.constantcw_path.value}",
+                f"caid                          = {self.constantcw_caid.value}",
+                f"group                         = {self.constantcw_group.value}",
+                ""  # Prazan red na kraju reader-a
+            ])
+
+        # Snimanje u fajl
+        if reader_lines:
+            server_path = config.plugins.CiefpOscamEditor.dvbapi_path.value.replace("oscam.dvbapi", "oscam.server")
+            try:
+                os.makedirs(os.path.dirname(server_path), exist_ok=True)
+
+                # Proveri da li fajl već postoji i da li ima sadržaja
+                file_exists = os.path.exists(server_path) and os.path.getsize(server_path) > 0
+
+                with open(server_path, "a") as f:
+                    # Ako fajl već postoji i ima sadržaj, dodaj prazan red pre novog reader-a
+                    if file_exists and reader_lines:
+                        f.write("\n")
+
+                    f.write("\n".join(reader_lines))
+
+                # DODAJ TIMEOUT OD 5 SEKUNDI
+                self.session.open(MessageBox, "Čitač uspešno dodat!", MessageBox.TYPE_INFO, timeout=5)
+                self.close()
+            except Exception as e:
+                self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
+        
 class CiefpOscamServerAdd(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Dodaj čitač u oscam.server ::..">
+    <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Dodaj čitač ::..">
         <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session):
@@ -999,51 +1543,31 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         self.setTitle(get_translation("title_add_reader"))
         self["key_red"] = Label(get_translation("cancel"))
         self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("add_emulator"))
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "red": self.close,
             "green": self.save,
+            "yellow": self.addEmulator,
             "cancel": self.close
         }, -2)
 
+
+        # Osnovne postavke čitača
         self.label = ConfigText(default="", fixed_size=False)
         self.protocol = ConfigSelection(default="cccam", choices=[
             ("cccam", get_translation("protocol") + ": cccam"),
-            ("cccam_mcs", get_translation("protocol") + ": cccam_mcs")
+            ("cccam_mcs", get_translation("protocol") + ": cccam_mcs"),
+            ("mgcamd", get_translation("protocol") + ": mgcamd")
         ])
         self.device = ConfigText(default="", fixed_size=False)
         self.user = ConfigText(default="", fixed_size=False)
         self.password = ConfigText(default="", fixed_size=False)
-        self.inactivitytimeout = ConfigSelection(default="-1", choices=[
-            ("-1", "-1"),
-            ("0", "0"),
-            ("30", "30"),
-            ("60", "60")
-        ])
-        self.cacheex = ConfigSelection(default="1", choices=[
-            ("0", "0"),
-            ("1", "1"),
-            ("2", "2"),
-            ("3", "3")
-        ])
-        self.group = ConfigSelection(default="2", choices=[
-            ("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"),
-            ("6", "6"), ("7", "7"), ("8", "8"), ("9", "9"), ("10", "10")
-        ])
-        self.emmcache = ConfigSelection(default="1,3,2,0", choices=[
-            ("1,3,2,0", "1,3,2,0"),
-            ("1,5,2,0", "1,5,2,0"),
-            ("1,1,2,0", "1,1,2,0")
-        ])
-        self.disablecrccws = ConfigSelection(default="0", choices=[
-            ("0", "0"),
-            ("1", "1")
-        ])
-        self.disablecrccws_only_for = ConfigSelection(default="0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000", choices=[
-            ("0", "0"),
-            ("0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000", 
-             "0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000")
-        ])
-        self.cccversion = ConfigSelection(default="2.0.11", choices=[
+        
+        # Mgcamd specifične postavke
+        self.deskey = ConfigText(default="01 02 03 04 05 06 07 08 09 10 11 12 13 14", fixed_size=False)
+        
+        # CCCam specifične postavke
+        self.cccversion = ConfigSelection(default="2.3.0", choices=[
             ("2.0.11", "2.0.11"), ("2.1.1", "2.1.1"), ("2.1.2", "2.1.2"),
             ("2.1.3", "2.1.3"), ("2.1.4", "2.1.4"), ("2.2.0", "2.2.0"),
             ("2.2.1", "2.2.1"), ("2.3.0", "2.3.0"), ("2.3.1", "2.3.1"),
@@ -1055,7 +1579,42 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         self.ccckeepalive = ConfigSelection(default="1", choices=[
             ("0", "0"), ("1", "1")
         ])
+        
+        # Napredne postavke
+        self.inactivitytimeout = ConfigSelection(default="-1", choices=[
+            ("-1", "-1"),
+            ("0", "0"),
+            ("30", "30"),
+            ("60", "60")
+        ])
+        self.group = ConfigSelection(default="1", choices=[
+            ("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"),
+            ("6", "6"), ("7", "7"), ("8", "8"), ("9", "9"), ("10", "10")
+        ])
+        self.cacheex = ConfigSelection(default="1", choices=[
+            ("0", "0"),
+            ("1", "1"),
+            ("2", "2"),
+            ("3", "3")
+        ])
+        self.emmcache = ConfigSelection(default="1,3,2,0", choices=[
+            ("1,3,2,0", "1,3,2,0"),
+            ("1,5,2,0", "1,5,2,0"),
+            ("1,1,2,0", "1,1,2,0")
+        ])
+        self.disablecrccws = ConfigSelection(default="0", choices=[
+            ("0", "0"),
+            ("1", "1")
+        ])
+        self.disablecrccws_only_for = ConfigText(
+            default="0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
+            fixed_size=False
+        )
 
+        self.protocol.addNotifier(self.protocolChanged, initial_call=True)
+        self.createSetup()
+
+    def protocolChanged(self, configElement):
         self.createSetup()
 
     def createSetup(self):
@@ -1063,18 +1622,36 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             getConfigListEntry(get_translation("label") + ":", self.label),
             getConfigListEntry(get_translation("protocol") + ":", self.protocol),
             getConfigListEntry(get_translation("device") + ":", self.device),
+        ]
+        
+        # Dodaj DES key samo za Mgcamd
+        if self.protocol.value == "mgcamd":
+            self.list.append(getConfigListEntry(get_translation("deskey") + ":", self.deskey))
+        
+        # Opšte postavke
+        self.list.extend([
             getConfigListEntry(get_translation("user") + ":", self.user),
             getConfigListEntry(get_translation("password") + ":", self.password),
+        ])
+        
+        # CCCam specifične postavke
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            self.list.extend([
+                getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
+                getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
+                getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive),
+            ])
+        
+        # Napredne postavke
+        self.list.extend([
             getConfigListEntry(get_translation("inactivity_timeout") + ":", self.inactivitytimeout),
-            getConfigListEntry(get_translation("cacheex") + ":", self.cacheex),
             getConfigListEntry(get_translation("group") + ":", self.group),
+            getConfigListEntry(get_translation("cacheex") + ":", self.cacheex),
             getConfigListEntry(get_translation("emm_cache") + ":", self.emmcache),
             getConfigListEntry(get_translation("disable_crc_cws") + ":", self.disablecrccws),
-            getConfigListEntry(get_translation("disable_crc_cws_only_for") + ":", self.disablecrccws_only_for),
-            getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
-            getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
-            getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive)
-        ]
+            getConfigListEntry(get_translation("disable_crc_cws_only_for") + ":", self.disablecrccws_only_for)
+        ])
+        
         self["config"].list = self.list
         self["config"].l.setList(self.list)
 
@@ -1084,18 +1661,35 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             f"label                         = {self.label.value}",
             f"protocol                      = {self.protocol.value}",
             f"device                        = {self.device.value}",
+        ]
+        
+        # Mgcamd specifične postavke
+        if self.protocol.value == "mgcamd":
+            reader_lines.append(f"deskey                        = {self.deskey.value.strip()}")
+        
+        # Opšte postavke
+        reader_lines.extend([
             f"user                          = {self.user.value}",
             f"password                      = {self.password.value}",
+        ])
+        
+        # CCCam specifične postavke
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            reader_lines.extend([
+                f"cccversion                    = {self.cccversion.value}",
+                f"cccmaxhops                    = {self.cccmaxhops.value}",
+                f"ccckeepalive                  = {self.ccckeepalive.value}",
+            ])
+        
+        # Napredne postavke
+        reader_lines.extend([
             f"inactivitytimeout             = {self.inactivitytimeout.value}",
-            f"cacheex                       = {self.cacheex.value}",
             f"group                         = {self.group.value}",
+            f"cacheex                       = {self.cacheex.value}",
             f"emmcache                      = {self.emmcache.value}",
             f"disablecrccws                 = {self.disablecrccws.value}",
-            f"disablecrccws_only_for        = {self.disablecrccws_only_for.value}",
-            f"cccversion                    = {self.cccversion.value}",
-            f"cccmaxhops                    = {self.cccmaxhops.value}",
-            f"ccckeepalive                  = {self.ccckeepalive.value}"
-        ]
+            f"disablecrccws_only_for        = {self.disablecrccws_only_for.value}"
+        ])
 
         dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
         server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
@@ -1111,13 +1705,16 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         except Exception as e:
             print(f"Error saving reader: {str(e)}")
             self.session.open(MessageBox, get_translation("reader_add_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
+    
+    def addEmulator(self):
+        self.session.open(CiefpOscamEmulatorAdd)        
 
 class CiefpOscamServerReaderSelect(Screen):
     skin = """
     <screen name="CiefpOscamServerReaderSelect" position="center,center" size="900,800" title="..:: Izaberi čitač za brisanje ::..">
         <widget name="reader_list" position="10,10" size="880,650" font="Regular;26" scrollbarMode="showOnDemand" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session, lines):
@@ -1245,10 +1842,10 @@ class CiefpOscamServerReaderSelect(Screen):
         
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamEditorSettings" position="center,center" size="900,800" title="..:: Ciefp Oscam Editor Settings ::..">
+    <screen name="CiefpOscamEditorSettings" position="center,center" size="900,800" title="..:: Podešavanja ::..">
         <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="220,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
     </screen>"""
 
     def __init__(self, session):
@@ -1290,14 +1887,15 @@ class CiefpOscamEcmInfo(Screen):
     skin = """
     <screen name="CiefpOscamEcmInfo" position="center,center" size="1400,800" title="..:: ECM Info ::..">
         <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
-        <widget name="key_red" position="10,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="220,750" size="200,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background7.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
         Screen.__init__(self, session)
         self.session = session
+        self.setTitle(get_translation("title_ecm_info"))
         self["info_list"] = MenuList([], enableWrapAround=True)
         self["info_list"].l.setItemHeight(30)
         self["key_red"] = Label(get_translation("exit"))
@@ -1365,6 +1963,255 @@ class CiefpOscamEcmInfo(Screen):
             except Exception as e:
                 print(f"[CiefpOscamEditor] Greška pri čitanju ecm.info: {str(e)}")
         return info
+
+class CiefpOscamUserEditor(Screen, ConfigListScreen):
+    skin = """<screen name="CiefpOscamUserEditor" position="center,center" size="1400,800" title="..:: OSCam Korisnik Editor ::..">
+        <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background10.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        ConfigListScreen.__init__(self, [])
+        self.session = session
+        self.setTitle(get_translation("title_oscam_user_editor"))
+        self._rebuild_pending = False
+
+        # Default account - dvbapiau
+        self.dvbapiau_user = ConfigText(default="dvbapiau", fixed_size=False)
+        self.dvbapiau_description = ConfigText(default="DVB API User for Enigma2 with AU", fixed_size=False)
+        self.dvbapiau_pwd = ConfigText(default="dvbapiau", fixed_size=False)
+        self.dvbapiau_monlevel = ConfigSelection(default="4", choices=[("0", "0"), ("1", "1"), ("2", "2"), ("4", "4")])
+        self.dvbapiau_au = ConfigSelection(default="1", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+        self.dvbapiau_group = ConfigSelection(default="1,2,3,4,5,6,7,8,9,10", choices=[
+            ("1", "1"),
+            ("1,2", "1,2"),
+            ("1,2,3", "1,2,3"),
+            ("1,2,3,4,5,6", "1,2,3,4,5,6"),
+            ("1,2,3,4,5,6,7,8,9,10", "1,2,3,4,5,6,7,8,9,10")
+        ])
+        self.dvbapiau_services = ConfigSelection(default="!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8,!blocked-9,!blocked-10,!blocked-11,!blocked-12,!blocked-13,!blocked-14,!blocked-15", choices=[
+            ("0", "0"),
+            ("!blocked-1,!blocked-2", "!blocked-1,!blocked-2"),
+            ("!blocked-1,!blocked-2,!blocked-3,!blocked-4", "!blocked-1,!blocked-2,!blocked-3,!blocked-4"),
+            ("!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6", "!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6"),
+            ("!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8", "!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8"),
+            ("!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8,!blocked-9,!blocked-10", "!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8,!blocked-9,!blocked-10"),
+            ("!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8,!blocked-9,!blocked-10,!blocked-11,!blocked-12,!blocked-13,!blocked-14,!blocked-15", "!blocked-1,!blocked-2,!blocked-3,!blocked-4,!blocked-5,!blocked-6,!blocked-7,!blocked-8,!blocked-9,!blocked-10,!blocked-11,!blocked-12,!blocked-13,!blocked-14,!blocked-15")
+        ])
+        self.dvbapiau_cccmaxhops = ConfigText(default="2", fixed_size=False)
+        self.dvbapiau_cccreshare = ConfigSelection(default="0", choices=[("0", "0"), ("1", "1")])
+        self.dvbapiau_caid = ConfigText(default="09C4, 098C, 098D", fixed_size=False)
+        self.dvbapiau_keepalive = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.dvbapiau_disabled = ConfigSelection(default="0", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+
+        # Default account - anonymous
+        self.anonymous_user = ConfigText(default="anonymous", fixed_size=False)
+        self.anonymous_group = ConfigText(default="1", fixed_size=False)
+        self.anonymous_disabled = ConfigSelection(default="1", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+
+        # CacheEx opcija
+        self.enable_cacheex = ConfigYesNo(default=False)
+        self.enable_cacheex.addNotifier(self.cacheexChanged, initial_call=False)  # Callback za promenu
+        self.cacheex_user = ConfigText(default="cacheex123", fixed_size=False)
+        self.cacheex_pwd = ConfigText(default="cacheex123", fixed_size=False)
+        self.cacheex_description = ConfigText(default="CacheEx User", fixed_size=False)
+        self.cacheex_monlevel = ConfigSelection(default="4", choices=[("0", "0"), ("1", "1"), ("2", "2"), ("4", "4")])
+        self.cacheex_au = ConfigSelection(default="1", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+        self.cacheex_group = ConfigText(default="1", fixed_size=False)
+        self.cacheex_services = ConfigText(default="0", fixed_size=False)
+        self.cacheex_cccmaxhops = ConfigText(default="1", fixed_size=False)
+        self.cacheex_cccreshare = ConfigSelection(default="0", choices=[("0", "0"), ("1", "1")])
+        self.cacheex_caid = ConfigText(default="09C4,098C,098D", fixed_size=False)
+        self.cacheex_keepalive = ConfigSelection(default="1", choices=[("0", "0"), ("1", "1")])
+        self.cacheex_disabled = ConfigSelection(default="0", choices=[("0", get_translation("off")), ("1", get_translation("on"))])
+
+        # GUI
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("preview"))
+        self["key_blue"] = Label(get_translation("oscam_user"))
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
+            "red": self.close,
+            "green": self.saveConfig,
+            "yellow": self.previewFile,
+            "blue": self.close,
+            "cancel": self.close,
+            "up": self.moveUp,
+            "down": self.moveDown
+        }, -2)
+
+        self.createSetup()
+        self["config"].onSelectionChanged.append(self.onSelectionChanged)
+
+    def cacheexChanged(self, configElement):
+        """Callback kada se enable_cacheex promeni."""
+        self.createSetup()
+
+    def onSelectionChanged(self):
+        current = self["config"].getCurrent()
+        if not current:
+            return
+        key = current[0].lower()
+        if not any(x in key for x in ["au", "cccreshare", "keepalive", "disabled"]):
+            return
+        if hasattr(self, "_rebuild_pending") and self._rebuild_pending:
+            return
+        try:
+            self._rebuild_pending = True
+            self["config"].blockInputHelpers = True
+            self.createSetup()
+        finally:
+            self._rebuild_pending = False
+            self["config"].blockInputHelpers = False
+
+    def createSetup(self):
+        self.list = [
+            getConfigListEntry("=== [account] dvbapiau ===", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("user"), self.dvbapiau_user),
+            getConfigListEntry(get_translation("description"), self.dvbapiau_description),
+            getConfigListEntry(get_translation("pwd"), self.dvbapiau_pwd),
+            getConfigListEntry(get_translation("monlevel"), self.dvbapiau_monlevel),
+            getConfigListEntry(get_translation("au"), self.dvbapiau_au),
+            getConfigListEntry(get_translation("group"), self.dvbapiau_group),
+            getConfigListEntry(get_translation("services"), self.dvbapiau_services),
+            getConfigListEntry(get_translation("cccmaxhops"), self.dvbapiau_cccmaxhops),
+            getConfigListEntry(get_translation("cccreshare"), self.dvbapiau_cccreshare),
+            getConfigListEntry(get_translation("caid"), self.dvbapiau_caid),
+            getConfigListEntry(get_translation("keepalive"), self.dvbapiau_keepalive),
+            getConfigListEntry(get_translation("disabled"), self.dvbapiau_disabled),
+            getConfigListEntry("=== [account] anonymous ===", ConfigText(default="", fixed_size=True)),
+            getConfigListEntry(get_translation("user"), self.anonymous_user),
+            getConfigListEntry(get_translation("group"), self.anonymous_group),
+            getConfigListEntry(get_translation("disabled"), self.anonymous_disabled),
+            getConfigListEntry(get_translation("enable_cacheex"), self.enable_cacheex)
+        ]
+        if self.enable_cacheex.value:
+            self.list.append(getConfigListEntry("=== [account] cacheex123 ===", ConfigText(default="", fixed_size=True)))
+            self.list.append(getConfigListEntry(get_translation("user"), self.cacheex_user))
+            self.list.append(getConfigListEntry(get_translation("description"), self.cacheex_description))
+            self.list.append(getConfigListEntry(get_translation("pwd"), self.cacheex_pwd))
+            self.list.append(getConfigListEntry(get_translation("monlevel"), self.cacheex_monlevel))
+            self.list.append(getConfigListEntry(get_translation("au"), self.cacheex_au))
+            self.list.append(getConfigListEntry(get_translation("group"), self.cacheex_group))
+            self.list.append(getConfigListEntry(get_translation("services"), self.cacheex_services))
+            self.list.append(getConfigListEntry(get_translation("cccmaxhops"), self.cacheex_cccmaxhops))
+            self.list.append(getConfigListEntry(get_translation("cccreshare"), self.cacheex_cccreshare))
+            self.list.append(getConfigListEntry(get_translation("caid"), self.cacheex_caid))
+            self.list.append(getConfigListEntry(get_translation("keepalive"), self.cacheex_keepalive))
+            self.list.append(getConfigListEntry(get_translation("disabled"), self.cacheex_disabled))
+        self["config"].list = self.list
+        self["config"].l.setList(self.list)
+
+    def saveConfig(self):
+        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+        user_path = dvbapi_path.replace("oscam.dvbapi", "oscam.user")
+
+        try:
+            lines = []
+            if not os.path.exists(user_path):
+                lines.append("## Created by CiefpOscamEditor ##")
+                lines.append("## ..:: CiefpSettings ::.. ##")
+                lines.append("")
+
+            # dvbapiau
+            lines.append("[account]")
+            lines.append(f"user                          = {self.dvbapiau_user.value}")
+            lines.append(f"pwd                           = {self.dvbapiau_pwd.value}")
+            lines.append(f"description                   = {self.dvbapiau_description.value}")
+            lines.append(f"monlevel                      = {self.dvbapiau_monlevel.value}")
+            lines.append(f"au                            = {self.dvbapiau_au.value}")
+            lines.append(f"group                         = {self.dvbapiau_group.value}")
+            if self.dvbapiau_services.value != "0":
+                lines.append(f"services                      = {self.dvbapiau_services.value}")
+            lines.append(f"cccmaxhops                    = {self.dvbapiau_cccmaxhops.value}")
+            lines.append(f"cccreshare                    = {self.dvbapiau_cccreshare.value}")
+            lines.append(f"caid                          = {self.dvbapiau_caid.value}")
+            lines.append(f"keepalive                      = {self.dvbapiau_keepalive.value}")
+            lines.append(f"disabled                      = {self.dvbapiau_disabled.value}")
+            lines.append("")
+
+            # anonymous
+            lines.append("[account]")
+            lines.append(f"user                          = {self.anonymous_user.value}")
+            lines.append(f"group                         = {self.anonymous_group.value}")
+            lines.append(f"disabled                      = {self.anonymous_disabled.value}")
+            lines.append("")
+
+            # cacheex123 (samo ako je enabled)
+            if self.enable_cacheex.value:
+                lines.append("[account]")
+                lines.append(f"user                          = {self.cacheex_user.value}")
+                lines.append(f"pwd                           = {self.cacheex_pwd.value}")
+                lines.append(f"description                   = {self.cacheex_description.value}")
+                lines.append(f"monlevel                      = {self.cacheex_monlevel.value}")
+                lines.append(f"au                            = {self.cacheex_au.value}")
+                lines.append(f"group                         = {self.cacheex_group.value}")
+                if self.cacheex_services.value != "0":
+                    lines.append(f"services                      = {self.cacheex_services.value}")
+                lines.append(f"cccmaxhops                    = {self.cacheex_cccmaxhops.value}")
+                lines.append(f"cccreshare                    = {self.cacheex_cccreshare.value}")
+                lines.append(f"caid                          = {self.cacheex_caid.value}")
+                lines.append(f"keepalive                      = {self.cacheex_keepalive.value}")
+                lines.append(f"disabled                      = {self.cacheex_disabled.value}")
+                lines.append("")
+
+            os.makedirs(os.path.dirname(user_path), exist_ok=True)
+            with open(user_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            os.system("killall -HUP oscam")  # Reload OSCam-a
+            self.session.open(MessageBox, get_translation("user_saved").format(user_path), MessageBox.TYPE_INFO, timeout=5)
+        except Exception as e:
+            self.session.open(MessageBox, get_translation("write_error").format(user_path, str(e)), MessageBox.TYPE_ERROR)
+
+    def previewFile(self):
+        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+        user_path = dvbapi_path.replace("oscam.dvbapi", "oscam.user")
+        self.session.open(CiefpOscamUserPreview, user_path)
+
+    def moveUp(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveUp)
+
+    def moveDown(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveDown)
+
+class CiefpOscamUserPreview(Screen):
+    skin = """<screen name="CiefpOscamUserPreview" position="center,center" size="1400,800" title="..:: Pregled oscam.user ::..">
+        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background11.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session, filepath):
+        Screen.__init__(self, session)
+        self.filepath = filepath
+        self.setTitle(get_translation("title_oscam_user_preview"))
+        self["file_list"] = MenuList([], enableWrapAround=True)
+        self["file_list"].l.setItemHeight(30)
+        self["key_red"] = Label(get_translation("exit"))
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+            "red": self.close,
+            "cancel": self.close
+        }, -2)
+        self.loadFile()
+
+    def loadFile(self):
+        try:
+            if os.path.exists(self.filepath):
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    lines = [line.rstrip() for line in f if line.strip()]
+                self["file_list"].setList(lines)
+            else:
+                self["file_list"].setList([get_translation("file_not_exist")])
+        except Exception as e:
+            self["file_list"].setList([get_translation("file_read_error").format(str(e))])
+
 
 def main(session, **kwargs):
     session.open(CiefpOscamEditorMain)
