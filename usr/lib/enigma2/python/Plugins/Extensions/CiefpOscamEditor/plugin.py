@@ -1,3 +1,5 @@
+import socket
+import urllib.request
 import requests
 import json
 import re
@@ -25,8 +27,6 @@ from Components.ConfigList import ConfigListScreen
 from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry
 from Components.MenuList import MenuList
 from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox, eTimer
-from packaging import version  # Dodajte import na vrhu (zahteva packaging biblioteku, ako nije instalirana, koristite string split)
-import urllib.request
 import urllib.error
 import base64
 import xml.etree.ElementTree as ET
@@ -103,24 +103,36 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
     ("60", get_translation("60_seconds"))
 ])
 
+
+
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.1.9"
+PLUGIN_VERSION = "1.2.0"
 
 def check_for_update(session):
     try:
+        print("[CiefpOscamEditor] Checking for updates...")
         current_version = PLUGIN_VERSION
-        with urllib.request.urlopen(VERSION_URL, timeout=5) as f:
+        print(f"[CiefpOscamEditor] Current version: {current_version}")
+        
+        # Koristimo Request sa User-Agent headerom
+        req = urllib.request.Request(VERSION_URL)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=10) as f:
             latest_version = f.read().decode("utf-8").strip()
+            print(f"[CiefpOscamEditor] Latest version: {latest_version}")
 
-        # Bolje poredjenje verzija
-        if version.parse(latest_version) > version.parse(current_version):
+        if latest_version != current_version:
+            print("[CiefpOscamEditor] New version available!")
             def onConfirmUpdate(answer):
                 if answer:
+                    print("[CiefpOscamEditor] Starting update...")
                     session.open(MessageBox, get_translation("update_in_progress"), MessageBox.TYPE_INFO, timeout=5)
                     subprocess.call(UPDATE_COMMAND, shell=True)
                 else:
+                    print("[CiefpOscamEditor] Update cancelled")
                     session.open(MessageBox, get_translation("update_cancelled"), MessageBox.TYPE_INFO, timeout=5)
 
             session.openWithCallback(
@@ -132,9 +144,14 @@ def check_for_update(session):
                 MessageBox.TYPE_YESNO
             )
         else:
-            session.open(MessageBox, "Plugin is up to date.", MessageBox.TYPE_INFO, timeout=5)
+            print("[CiefpOscamEditor] Plugin is up to date")
+            
+    except urllib.error.URLError as e:
+        print(f"[CiefpOscamEditor] URL Error: {e}")
+    except urllib.error.HTTPError as e:
+        print(f"[CiefpOscamEditor] HTTP Error: {e.code} {e.reason}")
     except Exception as e:
-        session.open(MessageBox, get_translation("update_check_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
+        print(f"[CiefpOscamEditor] Update check error: {e}")
 
 def get_oscam_info():
     version_file = "/var/volatile/tmp/.oscam/oscam.version"
@@ -339,6 +356,7 @@ class CiefpOscamStatus(Screen):
         self.interval = int(config.plugins.CiefpOscamEditor.refresh_interval.value) * 1000
         self.timer.start(self.interval, False)
         self.refreshStatus()
+        
 
     def toggleRefresh(self):
         if self.is_refreshing:
@@ -766,6 +784,13 @@ class CiefpOscamEditorMain(Screen):
         oscam_info = get_oscam_info()
         self.setTitle(f"{get_translation('title_main')} (OSCam: {oscam_info['version']})")
         self["channel_info"] = Label()
+        
+        
+        # Odložena provera verzije da bi se ekran prvo inicijalizovao
+        self.updateTimer = eTimer()
+        self.updateTimer.callback.append(lambda: check_for_update(self.session))
+        self.updateTimer.start(500, True)
+
 
         # nove labele
         self["key_red"] = Label(get_translation("exit"))
@@ -956,11 +981,7 @@ class CiefpOscamEditorMain(Screen):
 
     def openSettings(self):
         self.session.open(CiefpOscamEditorSettings)
-
-        # Odložena provera verzije da bi se ekran prvo inicijalizovao
-        self.updateTimer = eTimer()
-        self.updateTimer.callback.append(lambda: check_for_update(self.session))
-        self.updateTimer.start(500, True)
+       
 
         # Automatsko podešavanje putanje
         if config.plugins.CiefpOscamEditor.auto_version_path.value == "yes" and oscam_info["config_dir"] != "Unknown":
