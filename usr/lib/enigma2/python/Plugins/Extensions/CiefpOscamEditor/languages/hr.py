@@ -129,4 +129,6 @@ translations = {
    "select_reader": "Odaberi Čitač",
    "oscam_user_preview": "Pregled OSCam Korisnika",
    "oscam_user": "OSCam Korisnik",
+   "functions": "Funkcije",
+   "select_function": "..:: Izaberi Funkciju ::..",
 }

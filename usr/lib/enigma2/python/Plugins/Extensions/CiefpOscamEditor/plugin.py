@@ -25,6 +25,7 @@ from Components.ConfigList import ConfigListScreen
 from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry
 from Components.MenuList import MenuList
 from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox, eTimer
+from packaging import version  # Dodajte import na vrhu (zahteva packaging biblioteku, ako nije instalirana, koristite string split)
 import urllib.request
 import urllib.error
 import base64
@@ -105,7 +106,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.1.8"
+PLUGIN_VERSION = "1.1.9"
 
 def check_for_update(session):
     try:
@@ -113,7 +114,8 @@ def check_for_update(session):
         with urllib.request.urlopen(VERSION_URL, timeout=5) as f:
             latest_version = f.read().decode("utf-8").strip()
 
-        if latest_version != current_version:
+        # Bolje poredjenje verzija
+        if version.parse(latest_version) > version.parse(current_version):
             def onConfirmUpdate(answer):
                 if answer:
                     session.open(MessageBox, get_translation("update_in_progress"), MessageBox.TYPE_INFO, timeout=5)
@@ -129,6 +131,8 @@ def check_for_update(session):
                 f"{get_translation('update_question')}",
                 MessageBox.TYPE_YESNO
             )
+        else:
+            session.open(MessageBox, "Plugin is up to date.", MessageBox.TYPE_INFO, timeout=5)
     except Exception as e:
         session.open(MessageBox, get_translation("update_check_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
 
