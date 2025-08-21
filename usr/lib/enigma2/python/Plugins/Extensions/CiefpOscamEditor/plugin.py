@@ -744,7 +744,7 @@ class CiefpOscamConfEditor(Screen, ConfigListScreen):
 
     def moveDown(self):
         self["config"].instance.moveSelection(self["config"].instance.moveDown)
-
+       
 class CiefpOscamEditorMain(Screen):
     skin = """
     <screen name="CiefpOscamEditorMain" position="center,center" size="1400,800" title="..:: Ciefp Oscam Editor ::..">
@@ -762,30 +762,201 @@ class CiefpOscamEditorMain(Screen):
         oscam_info = get_oscam_info()
         self.setTitle(f"{get_translation('title_main')} (OSCam: {oscam_info['version']})")
         self["channel_info"] = Label()
-        self["key_green"] = Label(get_translation("add_dvbapi"))
+
+        # nove labele
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("functions"))
         self["key_yellow"] = Label(get_translation("settings"))
-        self["key_red"] = Label(get_translation("oscam_conf"))  # Bivši "Exit", sada "oscam.conf"
-        self["key_blue"] = Label(get_translation("oscam_server"))
+        self["key_blue"] = Label(get_translation("free_cccam"))
         self["background"] = Pixmap()
+
+        # action map
         self["actions"] = ActionMap(["ColorActions"], {
-            "red": self.openOscamConfEditor,  # Samo crveno dugme
-            "green": self.openAddDvbapi,
+            "red": self.close,
+            "green": self.openChoiceBox,
             "yellow": self.openSettings,
-            "blue": self.openServerPreview
+            "blue": self.addFreeReader,
         }, -2)
 
-        # Dodaj poseban ActionMap za "cancel"
         self["cancel_action"] = ActionMap(["SetupActions"], {
             "cancel": self.close
         }, -2)
+
         self.current_provider_id = "000000"
         self.updateChannelInfo()
+
+    def openChoiceBox(self):
+        choices = [
+            # oscam.conf
+            (get_translation("oscam_conf_editor"), "conf_editor"),
+            (get_translation("oscam_conf_preview"), "conf_preview"),
+
+            # oscam.info
+            (get_translation("oscam_info_button"), "info"),
+            (get_translation("oscam_status"), "status"),
+            (get_translation("ecm_info"), "ecm_info"),
+
+            # dvbapi
+            (get_translation("add_dvbapi"), "dvbapi_add"),
+            (get_translation("preview_dvbapi"), "dvbapi_preview"),
+
+            # oscam.server
+            (get_translation("oscam_server"), "server_preview"),
+            (get_translation("add_reader"), "server_add"),
+            (get_translation("add_emulator"), "server_emulator"),
+            (get_translation("select_reader"), "server_reader_select"),
+
+            # oscam.user
+            (get_translation("oscam_user_preview"), "user_preview"),
+            (get_translation("oscam_user"), "user_editor"),
+        ]
+        self.session.openWithCallback(self.choiceBoxCallback, ChoiceBox,
+                                      title=get_translation("select_function"),
+                                      list=choices)
+
+    def choiceBoxCallback(self, choice):
+        if choice is None:
+            return
+        selection = choice[1]
+
+        # oscam.conf
+        if selection == "conf_editor":
+            self.session.open(CiefpOscamConfEditor)
+        elif selection == "conf_preview":
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
+            self.session.open(CiefpOscamConfPreview, conf_path)
+
+        # oscam.info
+        elif selection == "info":
+            self.session.open(CiefpOscamInfo)
+        elif selection == "status":
+            self.session.open(CiefpOscamStatus)
+        elif selection == "ecm_info":
+            self.session.open(CiefpOscamEcmInfo)
+
+        # dvbapi
+        elif selection == "dvbapi_add":
+            self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
+        elif selection == "dvbapi_preview":
+            self.session.open(CiefpOscamEditorPreview)
+
+        # oscam.server
+        elif selection == "server_preview":
+            self.session.open(CiefpOscamServerPreview)
+        elif selection == "server_add":
+            self.session.open(CiefpOscamServerAdd)
+        elif selection == "server_emulator":
+            self.session.open(CiefpOscamEmulatorAdd)
+        elif selection == "server_reader_select":
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
+            lines = []
+            try:
+                if os.path.exists(server_path):
+                    with open(server_path, "r", encoding="utf-8") as f:
+                        lines = [line.rstrip() for line in f]
+                else:
+                    lines = [get_translation("file_not_exist")]
+                self.session.open(CiefpOscamServerReaderSelect, lines)
+            except Exception as e:
+                self.session.open(MessageBox, get_translation("file_read_error").format(str(e)), MessageBox.TYPE_ERROR,
+                                  timeout=5)
+
+        # oscam.user
+        elif selection == "user_preview":
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            user_path = dvbapi_path.replace("oscam.dvbapi", "oscam.user")
+            self.session.open(CiefpOscamUserPreview, user_path)
+        elif selection == "user_editor":
+            self.session.open(CiefpOscamUserEditor)
+    
+    def addFreeReader(self):
+        def onSourceSelected(selected):
+            if not selected or not selected[1]:
+                return
+            selected_url, selected_name = selected[1], selected[0]
+            label_name = selected_name.replace(" ", "_").lower()
+
+            try:
+                html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
+                match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
+                if not match:
+                    self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
+                    return
+
+                server, port, user, password = match.groups()
+                password = re.sub(r'<.*?>', '', password)
+                password = unescape(password).strip()
+
+                reader_lines = [
+                    "[reader]",
+                    f"label                         = {label_name}",
+                    "protocol                      = cccam",
+                    f"device                        = {server},{port}",
+                    f"user                          = {user}",
+                    f"password                      = {password}",
+                    "inactivitytimeout             = -1",
+                    "cacheex                       = 1",
+                    "group                         = 2",
+                    "emmcache                      = 1,3,2,0",
+                    "disablecrccws                 = 0",
+                    "disablecrccws_only_for        = 0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
+                    "cccversion                    = 2.0.11",
+                    "cccmaxhops                    = 2",
+                    "ccckeepalive                  = 1"
+                ]
+
+                dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+                server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
+
+                os.makedirs(os.path.dirname(server_path), exist_ok=True)
+                with open(server_path, "a", encoding="utf-8") as f:
+                    f.write("\n" + "\n".join(reader_lines) + "\n")
+
+                os.system("killall -HUP oscam")
+                self.session.open(
+                    MessageBox,
+                    f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
+                    MessageBox.TYPE_INFO,
+                    timeout=5
+                )
+
+            except Exception as e:
+                self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
+
+        choices = [
+            (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
+            (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
+            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content")
+        ]
+
+        self.session.openWithCallback(
+            onSourceSelected,
+            ChoiceBox,
+            title=get_translation("select_source"),
+            list=choices
+        )
+
+    def updateLines(self, updated_lines):
+        if updated_lines:
+            self.lines = updated_lines
+            self["file_list"].setList(self.lines)
+
+    def moveUp(self):
+        self["file_list"].up()
+
+    def moveDown(self):
+        self["file_list"].down()
+                
+
+    def openSettings(self):
+        self.session.open(CiefpOscamEditorSettings)
 
         # Odložena provera verzije da bi se ekran prvo inicijalizovao
         self.updateTimer = eTimer()
         self.updateTimer.callback.append(lambda: check_for_update(self.session))
         self.updateTimer.start(500, True)
-
 
         # Automatsko podešavanje putanje
         if config.plugins.CiefpOscamEditor.auto_version_path.value == "yes" and oscam_info["config_dir"] != "Unknown":
@@ -892,6 +1063,9 @@ class CiefpOscamEditorMain(Screen):
         except Exception as e:
             from Screens.MessageBox import MessageBox
             self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=10)
+                 
+    def addReader(self):
+        self.session.open(CiefpOscamServerAdd)      
     
     def openAddDvbapi(self):
         self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)

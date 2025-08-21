@@ -101,4 +101,32 @@ translations = {
     "disabled": "Onemogućeno",
     "yes": "Da",
     "no": "Ne",
+    # ... postojeći prevodi ...
+    # Vremenski intervali
+    "5_seconds": "5 sekundi",
+    "10_seconds": "10 sekundi",
+    "30_seconds": "30 sekundi",
+    "60_seconds": "60 sekundi",
+    # Uključivanje/isključivanje
+    "on": "Uključeno",
+    "off": "Isključeno",
+    #FreeCCcam
+    "cccamia_free": "CCcamia Besplatno",
+    "cccam_premium": "CCcam Premium",
+    "cccamiptv_free": "CCcamIPTV Besplatno",
+    "select_source": "..:: Odaberi Izvor ::..",
+    # ChoiceBox options
+    "oscam_conf_editor": "OSCam Uređivač Konfiguracije",
+    "oscam_conf_preview": "Pregled OSCam Konfiguracije",
+   "info": "OSCam Informacije",
+   "oscam_status": "OSCam Status",
+   "ecm_info": "ECM Informacije",
+   "add_dvbapi": "Dodaj DVBapi",
+   "preview_dvbapi": "DVBAPI Pregled",
+   "oscam_server": "OSCam Server",
+   "add_reader": "Dodaj Čitač",
+   "add_emulator": "Dodaj Emulator",
+   "select_reader": "Odaberi Čitač",
+   "oscam_user_preview": "Pregled OSCam Korisnika",
+   "oscam_user": "OSCam Korisnik",
 }

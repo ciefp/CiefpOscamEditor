@@ -101,4 +101,34 @@ translations = {
     "disabled": "Deshabilitado",
     "yes": "Sí",
     "no": "No",
+    # ... traducciones existentes ...
+    # Intervalos de tiempo
+    "5_seconds": "5 Segundos",
+    "10_seconds": "10 Segundos",
+    "30_seconds": "30 Segundos",
+    "60_seconds": "60 Segundos",
+    # Encendido/Apagado
+    "on": "Encendido",
+    "off": "Apagado",
+    #FreeCCcam
+    "cccamia_free": "CCcamia Gratis",
+    "cccam_premium": "CCcam Premium",
+    "cccamiptv_free": "CCcamIPTV Gratis",
+    "select_source": "..:: Seleccionar Fuente ::..",
+    # ChoiceBox options
+    "oscam_conf_editor": "Editor de Configuración OSCam",
+    "oscam_conf_preview": "Vista Previa de Configuración OSCam",
+    "info": "Información OSCam",
+    "oscam_status": "Estado OSCam",
+    "ecm_info": "Información ECM",
+    "add_dvbapi": "Añadir DVBapi",
+    "preview_dvbapi": "Vista Previa DVBAPI",
+    "oscam_server": "Servidor OSCam",
+    "add_reader": "Añadir Lector",
+    "add_emulator": "Añadir Emulador",
+    "select_reader": "Seleccionar Lector",
+    "oscam_user_preview": "Vista Previa de Usuarios OSCam",
+    "oscam_user": "Usuario OSCam",
+    "functions": "Functions",
+    "select_function": "..:: Select Functions ::..",
 }

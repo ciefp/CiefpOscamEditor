@@ -101,4 +101,24 @@ translations = {
     "disabled": "معطل",
     "yes": "نعم",
     "no": "لا",
+    # ... الترجمات الحالية ...
+    # الفترات الزمنية
+    "5_seconds": "5 ثوانٍ",
+    "10_seconds": "10 ثوانٍ",
+    "30_seconds": "30 ثانية",
+    "60_seconds": "60 ثانية",
+    # تشغيل/إيقاف
+    "on": "مفعل",
+    "off": "معطل",
+    # خيارات ChoiceBox
+    "conf_editor": "محرر OSCam Conf",
+    "conf_preview": "معاينة oscam.conf",
+    "info": "معلومات OSCam",
+    "dvbapi_add": "إضافة سطر DVBAPI",
+    "dvbapi_preview": "معاينة DVBAPI",
+    "server_add": "إضافة قارئ الخادم",
+    "server_emulator": "إضافة محاكي",
+    "server_reader_select": "اختيار قارئ الخادم",
+    "user_preview": "معاينة oscam.user",
+    "user_editor": "محرر OSCam User",
 }

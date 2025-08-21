@@ -101,4 +101,24 @@ translations = {
     "disabled": "Zakázané",
     "yes": "Áno",
     "no": "Nie",
+    # ... postojeći prevodi ...
+    # Časové intervaly
+    "5_seconds": "5 sekúnd",
+    "10_seconds": "10 sekúnd",
+    "30_seconds": "30 sekúnd",
+    "60_seconds": "60 sekúnd",
+    # Zapnutie/vypnutie
+    "on": "Zapnuté",
+    "off": "Vypnuté",
+    # ChoiceBox možnosti
+    "conf_editor": "OSCam Conf Editor",
+    "conf_preview": "Náhľad oscam.conf",
+    "info": "OSCam Info",
+    "dvbapi_add": "Pridať DVBAPI riadok",
+    "dvbapi_preview": "Náhľad DVBAPI",
+    "server_add": "Pridať čítač servera",
+    "server_emulator": "Pridať emulátor",
+    "server_reader_select": "Vybrať čítač servera",
+    "user_preview": "Náhľad oscam.user",
+    "user_editor": "OSCam User Editor",
 }

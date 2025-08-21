@@ -101,4 +101,34 @@ translations = {
     "disabled": "Devre dışı",
     "yes": "Evet",
     "no": "Hayır",
+    # ... mevcut çeviriler ...
+    # Zaman aralıkları
+    "5_seconds": "5 Saniye",
+    "10_seconds": "10 Saniye",
+    "30_seconds": "30 Saniye",
+    "60_seconds": "60 Saniye",
+    # Açık/Kapalı
+    "on": "Açık",
+    "off": "Kapalı",
+    #FreeCCcam
+    "cccamia_free": "CCcamia Ücretsiz",
+    "cccam_premium": "CCcam Premium",
+    "cccamiptv_free": "CCcamIPTV Ücretsiz",
+    "select_source": "..:: Kaynak Seç ::..",
+    # ChoiceBox options
+    "oscam_conf_editor": "OSCam Yapılandırma Düzenleyici",
+    "oscam_conf_preview": "OSCam Yapılandırma Önizleme",
+    "info": "OSCam Bilgileri",
+    "oscam_status": "OSCam Durumu",
+    "ecm_info": "ECM Bilgileri",
+    "add_dvbapi": "DVBapi Ekle",
+    "preview-dvbapi": "DVBAPI Önizleme",
+    "oscam_server": "OSCam Sunucusu",
+    "add_reader": "Okuyucu Ekle",
+    "add_emulator": "Emülatör Ekle",
+    "select_reader": "Okuyucu Seç",
+    "oscam_user_preview": "OSCam Kullanıcı Önizleme",
+    "oscam_user": "OSCam Kullanıcısı",
+    "functions": "Functions",
+    "select_function": "..:: Select Functions ::..",
 }

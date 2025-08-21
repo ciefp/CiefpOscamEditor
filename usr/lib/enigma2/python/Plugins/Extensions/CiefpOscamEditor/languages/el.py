@@ -101,4 +101,24 @@ translations = {
     "disabled": "Απενεργοποιημένο",
     "yes": "Ναι",
     "no": "Όχι",
+    # ... υπάρχοντες μεταφράσεις ...
+    # Χρονικά διαστήματα
+    "5_seconds": "5 Δευτερόλεπτα",
+    "10_seconds": "10 Δευτερόλεπτα",
+    "30_seconds": "30 Δευτερόλεπτα",
+    "60_seconds": "60 Δευτερόλεπτα",
+    # Ενεργοποίηση/Απενεργοποίηση
+    "on": "Ενεργό",
+    "off": "Ανενεργό",
+    # Επιλογές ChoiceBox
+    "conf_editor": "Επεξεργαστής OSCam Conf",
+    "conf_preview": "Προεπισκόπηση oscam.conf",
+    "info": "Πληροφορίες OSCam",
+    "dvbapi_add": "Προσθήκη γραμμής DVBAPI",
+    "dvbapi_preview": "Προεπισκόπηση DVBAPI",
+    "server_add": "Προσθήκη αναγνώστη διακομιστή",
+    "server_emulator": "Προσθήκη εξομοιωτή",
+    "server_reader_select": "Επιλογή αναγνώστη διακομιστή",
+    "user_preview": "Προεπισκόπηση oscam.user",
+    "user_editor": "Επεξεργαστής OSCam User",
 }
