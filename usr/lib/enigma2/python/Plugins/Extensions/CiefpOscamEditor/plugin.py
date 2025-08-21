@@ -105,7 +105,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.1.7"
+PLUGIN_VERSION = "1.1.8"
 
 def check_for_update(session):
     try:
