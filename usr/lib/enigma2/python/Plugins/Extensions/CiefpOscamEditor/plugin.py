@@ -20,14 +20,27 @@ from Plugins.Extensions.CiefpOscamEditor.languages.es import translations as es_
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Screens.ChoiceBox import ChoiceBox
+from Screens.VirtualKeyBoard import VirtualKeyBoard
 from Components.Pixmap import Pixmap
 from Components.ActionMap import ActionMap
 from Components.Label import Label
 from Components.ConfigList import ConfigListScreen
 from Components.config import config, ConfigSubsection, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry
+from Components.MultiContent import MultiContentEntryText, MultiContentEntryPixmapAlphaTest
+from Components.Sources.List import List  # Ispravan import za List
 from Components.MenuList import MenuList
+from ServiceReference import ServiceReference
+from Components.Sources.ServiceEvent import ServiceEvent
+from enigma import eServiceCenter, iServiceInformation
+from enigma import eListboxPythonMultiContent, gFont
+from enigma import eTimer, gFont, loadPNG, RT_HALIGN_LEFT, RT_VALIGN_CENTER
 from enigma import eServiceCenter, eServiceReference, iServiceInformation, eListbox, eTimer
+from enigma import eListbox, eListboxPythonMultiContent, RT_HALIGN_LEFT, RT_VALIGN_CENTER, gFont, loadPNG
+from enigma import RT_HALIGN_LEFT, RT_VALIGN_CENTER, gFont
+from datetime import datetime
+import urllib.parse  
 import urllib.error
+import urllib.request
 import base64
 import xml.etree.ElementTree as ET
 from html import unescape
@@ -108,7 +121,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.0"
+PLUGIN_VERSION = "1.2.1"
 
 def check_for_update(session):
     try:
@@ -324,59 +337,50 @@ def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
     print("[CiefpOscamEditor] Nema dostupnih čitača")
     return []
 
-
-# Ažurirana klasa CiefpOscamStatus
 class CiefpOscamStatus(Screen):
-    skin = """<screen name="CiefpOscamStatus" position="center,center" size="1400,800" title="..:: OSCam Status ::..">
-        <widget name="status_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+    skin = """<screen name="CiefpOscamStatus" position="center,center" size="1500,800" title="..:: OSCam Status ::..">
+        <widget name="status_list" position="10,10" size="1080,740" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background6.png" position="1000,0" size="400,800" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_status.png" position="1100,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
         Screen.__init__(self, session)
         self.session = session
         self.is_refreshing = True
-        self["status_list"] = MenuList([], enableWrapAround=True)
+
+        # Umesto eListbox koristi MenuList sa MultiContent podrškom
+        self["status_list"] = MenuList([], enableWrapAround=True, content=eListboxPythonMultiContent)
         self["status_list"].l.setItemHeight(30)
+        self["status_list"].l.setFont(0, gFont("Regular", 24))
+
         self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("refresh"))
         self["key_yellow"] = Label(get_translation("ecm_info"))
+        self["key_blue"] = Label(get_translation("toggle_reader"))
         self["background"] = Pixmap()
+
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "red": self.close,
             "green": self.refreshStatus,
             "yellow": self.openEcmInfo,
+            "blue": self.toggleReader,
             "cancel": self.close
         }, -2)
+
         self.timer = eTimer()
         self.timer.callback.append(self.refreshStatus)
         self.interval = int(config.plugins.CiefpOscamEditor.refresh_interval.value) * 1000
         self.timer.start(self.interval, False)
         self.refreshStatus()
-        
-
-    def toggleRefresh(self):
-        if self.is_refreshing:
-            self.timer.stop()
-            self.is_refreshing = False
-            self["key_green"].setText(get_translation("start_refresh"))
-        else:
-            self.timer.start(self.interval, False)
-            self.is_refreshing = True
-            self["key_green"].setText(get_translation("refresh"))
-        self.refreshStatus()
 
     def refreshStatus(self):
         status_data = []
         try:
-            # Čitaj config iz oscam.conf bez prosleđivanja putanje
             conf = read_oscam_conf()
-            print(f"[CiefpOscamStatus] Konfiguracija: IP={conf['ip']}, Port={conf['port']}, User={conf['user']}")
-
-            # Dohvati čitače
             readers = get_oscam_readers(
                 ip=conf["ip"],
                 port=conf["port"],
@@ -386,22 +390,91 @@ class CiefpOscamStatus(Screen):
 
             if readers:
                 for reader in readers:
-                    status_data.append(
-                        f"{get_translation('reader')}: {reader['name']} | "
-                        f"{get_translation('status')}: {reader['status']} | "
-                        f"{get_translation('au')}: {reader['au']} | "
-                        f"{get_translation('idle_time')}: {reader['idle']} | "
-                        f"{get_translation('protocol')}: {reader['protocol']}"
-                    )
+                    status_lower = reader['status'].lower()
+                    if status_lower == "connected":
+                        icon_path = "/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/green.png"
+                    elif status_lower in ["needinit", "unknown"]:
+                        icon_path = "/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/yellow.png"
+                    else:
+                        icon_path = "/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/red.png"
+
+                    entry = [
+                        (reader['name'], reader['status']),  # data tuple
+                        MultiContentEntryPixmapAlphaTest(pos=(0, 7), size=(16, 16), png=loadPNG(icon_path)),
+                        MultiContentEntryText(
+                            pos=(30, 0), size=(1000, 30), font=0,
+                            flags=RT_HALIGN_LEFT | RT_VALIGN_CENTER,
+                            text=f"{get_translation('reader')}: {reader['name']} | "
+                                 f"{get_translation('status')}: {reader['status']} | "
+                                 f"{get_translation('au')}: {reader['au']} | "
+                                 f"{get_translation('idle_time')}: {reader['idle']} | "
+                                 f"{get_translation('protocol')}: {reader['protocol']}"
+                        )
+                    ]
+                    status_data.append(entry)
             else:
-                status_data.append(get_translation("no_status_data"))
-                print("[CiefpOscamStatus] Nema čitača ili greška u komunikaciji")
+                status_data.append([
+                    ("", ""),
+                    MultiContentEntryText(pos=(0, 0), size=(1000, 30), font=0,
+                                          text=get_translation("no_status_data"))
+                ])
 
         except Exception as e:
-            status_data.append(get_translation("connection_error").format(f"{str(e)}"))
-            print(f"[CiefpOscamStatus] Error: {str(e)}")
+            status_data.append([
+                ("", ""),
+                MultiContentEntryText(pos=(0, 0), size=(1000, 30), font=0,
+                                      text=get_translation("connection_error").format(f"{str(e)}"))
+            ])
 
         self["status_list"].setList(status_data)
+
+    def toggleReader(self):
+        # Uzmemo trenutno selektovanu stavku iz MenuList-a
+        current = self["status_list"].getCurrent()  # MenuList -> getCurrent(), ne getSelection()
+        if not current:
+            self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
+            return
+
+        # MultiContent format: prvi element je "data" koji si postavio kao (name, status)
+        data = current[0] if isinstance(current, (list, tuple)) and len(current) > 0 else None
+        if not (isinstance(data, (list, tuple)) and len(data) >= 2):
+            self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
+            return
+
+        reader_name, current_status = data[0], data[1]
+        if not reader_name:
+            self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
+            return
+
+        # OSCam label obično ne uključuje sufikse poput " (r)" ili " (p)"
+        clean_name = reader_name.split(" (")[0]
+
+        status_lower = (current_status or "").strip().lower()
+        # Sve što liči na OFF/grešku tretiramo kao kandidata za ENABLE
+        should_enable = status_lower in ("off", "error", "disabled", "down", "stopped", "unknown", "needinit")
+        action = "enable" if should_enable else "disable"
+
+        try:
+            conf = read_oscam_conf()
+            encoded_reader_name = urllib.parse.quote(clean_name)
+            url = f"http://{conf['ip']}:{conf['port']}/readers.html?label={encoded_reader_name}&action={action}"
+
+            req = urllib.request.Request(url)
+            if conf.get("user") and conf.get("pwd"):
+                auth_bytes = f"{conf['user']}:{conf['pwd']}".encode("utf-8")
+                req.add_header("Authorization", f"Basic {base64.b64encode(auth_bytes).decode('ascii')}")
+
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.getcode() == 200:
+                    msg = f"Reader '{clean_name}' is {'ON' if action == 'enable' else 'OFF'}."
+                    self.session.open(MessageBox, msg, MessageBox.TYPE_INFO, timeout=3)
+                    # odmah osveži listu (ako imaš timer auto-refresh, ovo je i dalje OK)
+                    self.refreshStatus()
+                else:
+                    raise Exception(f"HTTP {resp.getcode()}")
+
+        except Exception as e:
+            self.session.open(MessageBox, f"Error when changing the state of the reader: {e}", MessageBox.TYPE_ERROR, timeout=5)
 
     def openEcmInfo(self):
         self.session.open(CiefpOscamEcmInfo)
@@ -410,13 +483,12 @@ class CiefpOscamStatus(Screen):
         self.timer.stop()
         Screen.close(self)
 
-
 class CiefpOscamConfPreview(Screen):
     skin = """<screen name="CiefpOscamConfPreview" position="center,center" size="1400,800" title="..:: oscam.conf Preview ::..">
         <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background9.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_conf_preview.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session, filepath):
@@ -457,7 +529,7 @@ class CiefpOscamConfEditor(Screen, ConfigListScreen):
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
         <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background8.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_conf_editor.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -766,7 +838,7 @@ class CiefpOscamConfEditor(Screen, ConfigListScreen):
 
     def moveDown(self):
         self["config"].instance.moveSelection(self["config"].instance.moveDown)
-       
+
 class CiefpOscamEditorMain(Screen):
     skin = """
     <screen name="CiefpOscamEditorMain" position="center,center" size="1400,800" title="..:: Ciefp Oscam Editor ::..">
@@ -775,7 +847,7 @@ class CiefpOscamEditorMain(Screen):
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
         <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_editor_main.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -816,24 +888,28 @@ class CiefpOscamEditorMain(Screen):
 
     def openChoiceBox(self):
         choices = [
-            # oscam.conf
-            (get_translation("oscam_conf_editor"), "conf_editor"),
-            (get_translation("oscam_conf_preview"), "conf_preview"),
-
             # oscam.info
             (get_translation("oscam_info_button"), "info"),
             (get_translation("oscam_status"), "status"),
             (get_translation("ecm_info"), "ecm_info"),
-
-            # dvbapi
-            (get_translation("add_dvbapi"), "dvbapi_add"),
-            (get_translation("preview_dvbapi"), "dvbapi_preview"),
 
             # oscam.server
             (get_translation("oscam_server"), "server_preview"),
             (get_translation("add_reader"), "server_add"),
             (get_translation("add_emulator"), "server_emulator"),
             (get_translation("select_reader"), "server_reader_select"),
+
+            # softcamkey
+            (get_translation("softcam_key_preview"), "softcam_key_preview"),
+            (get_translation("add_biss_key"), "add_biss_key"),
+
+            # dvbapi
+            (get_translation("add_dvbapi"), "dvbapi_add"),
+            (get_translation("preview_dvbapi"), "dvbapi_preview"),
+
+            # oscam.conf
+            (get_translation("oscam_conf_editor"), "conf_editor"),
+            (get_translation("oscam_conf_preview"), "conf_preview"),
 
             # oscam.user
             (get_translation("oscam_user_preview"), "user_preview"),
@@ -848,27 +924,13 @@ class CiefpOscamEditorMain(Screen):
             return
         selection = choice[1]
 
-        # oscam.conf
-        if selection == "conf_editor":
-            self.session.open(CiefpOscamConfEditor)
-        elif selection == "conf_preview":
-            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
-            conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
-            self.session.open(CiefpOscamConfPreview, conf_path)
-
         # oscam.info
-        elif selection == "info":
+        if selection  == "info":
             self.session.open(CiefpOscamInfo)
         elif selection == "status":
             self.session.open(CiefpOscamStatus)
         elif selection == "ecm_info":
             self.session.open(CiefpOscamEcmInfo)
-
-        # dvbapi
-        elif selection == "dvbapi_add":
-            self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
-        elif selection == "dvbapi_preview":
-            self.session.open(CiefpOscamEditorPreview)
 
         # oscam.server
         elif selection == "server_preview":
@@ -891,6 +953,27 @@ class CiefpOscamEditorMain(Screen):
             except Exception as e:
                 self.session.open(MessageBox, get_translation("file_read_error").format(str(e)), MessageBox.TYPE_ERROR,
                                   timeout=5)
+
+        # softcamkey
+        elif selection == "softcam_key_preview":
+            self.session.open(CiefpOscamSoftCamKeyPreview)
+        elif selection == "add_biss_key":
+            self.addBissKey() 
+
+
+        # dvbapi
+        elif selection == "dvbapi_add":
+            self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
+        elif selection == "dvbapi_preview":
+            self.session.open(CiefpOscamEditorPreview)
+
+        # oscam.conf
+        elif selection == "conf_editor":
+            self.session.open(CiefpOscamConfEditor)
+        elif selection == "conf_preview":
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
+            self.session.open(CiefpOscamConfPreview, conf_path)
 
         # oscam.user
         elif selection == "user_preview":
@@ -1081,6 +1164,85 @@ class CiefpOscamEditorMain(Screen):
             self["channel_info"].setText(text)
         else:
             self["channel_info"].setText(get_translation("no_channel_info"))
+    
+    # DODAJ OVU METODU U CIEFPOSCAMEDITORMAIN KLASU
+    def addBissKey(self):
+        """Dodaje BISS ključ za trenutni kanal"""
+        # Dohvati informacije o trenutnom kanalu
+        service = self.session.nav.getCurrentService()
+        if not service:
+            self.session.open(MessageBox, get_translation("no_channel_selected"), MessageBox.TYPE_ERROR, timeout=3)
+            return
+        
+        info = service.info()
+        service_sid = info.getInfo(iServiceInformation.sSID) or -1
+        channel_name = info.getName() or "Unknown"
+        
+        # Formatiraj SID
+        sid = "%04X" % service_sid if service_sid != -1 else "0001"
+        
+        # Pokreni VirtualKeyBoard za unos BISS ključa
+        self.session.openWithCallback(
+            lambda key: self.bissKeyCallback(key, sid, channel_name),
+            VirtualKeyBoard, 
+            title=get_translation("enter_biss_key"),
+            text=""
+        )
+    
+    def bissKeyCallback(self, biss_key, sid, channel_name):
+        """Callback nakon unosa BISS ključa"""
+        if not biss_key:
+            return
+        
+        # Formatiraj ključ (ukloni razmake, velika slova)
+        formatted_key = biss_key.replace(" ", "").upper()
+        
+        # Proveri dužinu ključa (BISS može biti 8 ili 16 hex karaktera)
+        if len(formatted_key) not in [8, 16]:
+            self.session.open(MessageBox, get_translation("invalid_key_length"), MessageBox.TYPE_ERROR, timeout=3)
+            return
+        
+        # Vrijeme za komentar
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # ECM PID (default 1FFF)
+        ecmpid = "1FFF"
+        
+        # Spoji SID i ECM PID
+        sid_ecmpid = f"{sid}{ecmpid}"
+        
+        # Finalna linija za SoftCam.Key
+        line = f"F {sid_ecmpid} 00 {formatted_key} ; {channel_name} - {current_time}\n"
+        
+        try:
+            # Odredi putanju do SoftCam.Key
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
+            
+            # Kreiraj direktorijum ako ne postoji
+            os.makedirs(os.path.dirname(softcam_path), exist_ok=True)
+            
+            # Dodaj ključ u fajl
+            with open(softcam_path, "a", encoding="utf-8") as f:
+                f.write(line)
+            
+            # Reload OSCam-a
+            os.system("killall -HUP oscam")
+            
+            self.session.open(
+                MessageBox, 
+                get_translation("biss_key_added").format(channel_name), 
+                MessageBox.TYPE_INFO, 
+                timeout=3
+            )
+            
+        except Exception as e:
+            self.session.open(
+                MessageBox, 
+                get_translation("biss_key_error").format(str(e)), 
+                MessageBox.TYPE_ERROR, 
+                timeout=3
+            )        
 
     def openOscamConfEditor(self):
         try:
@@ -1088,6 +1250,7 @@ class CiefpOscamEditorMain(Screen):
         except Exception as e:
             from Screens.MessageBox import MessageBox
             self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=10)
+            
                  
     def addReader(self):
         self.session.open(CiefpOscamServerAdd)      
@@ -1107,7 +1270,7 @@ class CiefpOscamInfo(Screen):
         <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background5.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_info.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -1165,7 +1328,7 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
         <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background2.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/add_dvbapi.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session, default_provider="000000"):
@@ -1356,7 +1519,7 @@ class CiefpOscamEditorPreview(Screen):
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_blue" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background3.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_dvbapi_preview.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -1428,13 +1591,13 @@ class CiefpOscamEditorPreview(Screen):
 
 class CiefpOscamServerPreview(Screen):
     skin = """
-    <screen name="CiefpOscamServerPreview" position="center,center" size="1400,800" title="..:: oscam.server Pregled ::..">
+    <screen name="CiefpOscamServerPreview" position="center,center" size="1400,800" title="..:: oscam.server Preview ::..">
         <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
         <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background4.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_server_preview.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -1491,7 +1654,7 @@ class CiefpOscamServerPreview(Screen):
                 html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
-                    self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
+                    self.session.open(MessageBox, "C-line not found!", MessageBox.TYPE_ERROR, timeout=5)
                     return
 
                 server, port, user, password = match.groups()
@@ -1526,13 +1689,13 @@ class CiefpOscamServerPreview(Screen):
                 os.system("killall -HUP oscam")
                 self.session.open(
                     MessageBox,
-                    f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
+                    f"Reader '{label_name}' added from '{selected_name}', Oscam reloaded.",
                     MessageBox.TYPE_INFO,
                     timeout=5
                 )
 
             except Exception as e:
-                self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
+                self.session.open(MessageBox, f"Error: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
 
         choices = [
             (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
@@ -1560,11 +1723,12 @@ class CiefpOscamServerPreview(Screen):
         
 class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamEmulatorAdd" position="center,center" size="900,800" title="..:: Dodaj emulator čitač  ::..">
-        <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
+    <screen name="CiefpOscamEmulatorAdd" position="center,center" size="1400,800" title="..:: Add Emulator  ::..">
+        <widget name="config" position="10,10" size="980,650" scrollbarMode="showOnDemand" itemHeight="40" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />"
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08500" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/add_emulator.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -1577,6 +1741,7 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
         self["key_red"] = Label(get_translation("cancel"))
         self["key_green"] = Label(get_translation("save"))
         self["key_yellow"] = Label(get_translation("key_source"))
+        self["background"] = Pixmap()
         
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "red": self.close,
@@ -1725,31 +1890,41 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
                 self.close()
             except Exception as e:
                 self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
-        
-class CiefpOscamServerAdd(ConfigListScreen, Screen):
-    skin = """
-    <screen name="CiefpOscamServerAdd" position="center,center" size="900,800" title="..:: Dodaj čitač ::..">
-        <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
+
+class CiefpOscamServerAdd(Screen, ConfigListScreen):
+    skin = """<screen name="CiefpOscamServerAdd" position="center,center" size="1400,800" title="..:: Add Reader ::..">
+        <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F9F13" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/add_reader.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
         Screen.__init__(self, session)
         ConfigListScreen.__init__(self, [])
         self.session = session
-        self.setTitle(get_translation("title_add_reader"))
-        self["key_red"] = Label(get_translation("cancel"))
+        self.setTitle(get_translation("add_reader_title"))
+
+        self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("save"))
         self["key_yellow"] = Label(get_translation("add_emulator"))
-        self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
             "red": self.close,
             "green": self.save,
             "yellow": self.addEmulator,
-            "cancel": self.close
+            "cancel": self.close,
+            "up": self.moveUp,
+            "down": self.moveDown
         }, -2)
 
+        #Ispravljeno: sid umjesto caid
+        self.sid = ConfigText(default="0001", fixed_size=False)
+        self.provid = ConfigText(default="00", fixed_size=False)
+        self.channel_name = ConfigText(default="", fixed_size=False)
+
+        self.emulator_name = ConfigText(default="new_emulator", fixed_size=False)
 
         # Osnovne postavke čitača
         self.label = ConfigText(default="", fixed_size=False)
@@ -1761,10 +1936,10 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         self.device = ConfigText(default="", fixed_size=False)
         self.user = ConfigText(default="", fixed_size=False)
         self.password = ConfigText(default="", fixed_size=False)
-        
+
         # Mgcamd specifične postavke
         self.deskey = ConfigText(default="01 02 03 04 05 06 07 08 09 10 11 12 13 14", fixed_size=False)
-        
+
         # CCCam specifične postavke
         self.cccversion = ConfigSelection(default="2.3.0", choices=[
             ("2.0.11", "2.0.11"), ("2.1.1", "2.1.1"), ("2.1.2", "2.1.2"),
@@ -1778,23 +1953,17 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         self.ccckeepalive = ConfigSelection(default="1", choices=[
             ("0", "0"), ("1", "1")
         ])
-        
+
         # Napredne postavke
         self.inactivitytimeout = ConfigSelection(default="-1", choices=[
-            ("-1", "-1"),
-            ("0", "0"),
-            ("30", "30"),
-            ("60", "60")
+            ("-1", "-1"), ("0", "0"), ("30", "30"), ("60", "60")
         ])
         self.group = ConfigSelection(default="1", choices=[
             ("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"),
             ("6", "6"), ("7", "7"), ("8", "8"), ("9", "9"), ("10", "10")
         ])
         self.cacheex = ConfigSelection(default="1", choices=[
-            ("0", "0"),
-            ("1", "1"),
-            ("2", "2"),
-            ("3", "3")
+            ("0", "0"), ("1", "1"), ("2", "2"), ("3", "3")
         ])
         self.emmcache = ConfigSelection(default="1,3,2,0", choices=[
             ("1,3,2,0", "1,3,2,0"),
@@ -1802,16 +1971,47 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             ("1,1,2,0", "1,1,2,0")
         ])
         self.disablecrccws = ConfigSelection(default="0", choices=[
-            ("0", "0"),
-            ("1", "1")
+            ("0", "0"), ("1", "1")
         ])
         self.disablecrccws_only_for = ConfigText(
             default="0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
             fixed_size=False
         )
 
+        self.autoPopulateFromCurrentService()
         self.protocol.addNotifier(self.protocolChanged, initial_call=True)
         self.createSetup()
+        self["config"].onSelectionChanged.append(self.onSelectionChanged)
+
+    def autoPopulateFromCurrentService(self):
+        service = self.session.nav.getCurrentService()
+        if not service:
+            return
+
+        info = service.info()
+        if not info:
+            return
+
+        #Ispravno: dohvati pravi SID
+        sid = info.getInfo(iServiceInformation.sSID)
+        if sid != -1:
+            self.sid.value = "%04X" % sid  # → npr. 0001
+        else:
+            self.sid.value = "0001"
+
+        # Naziv kanala
+        channel_name = info.getName() or "Unknown Channel"
+        try:
+            channel_name = channel_name.encode('utf-8', 'ignore').decode('utf-8')
+        except:
+            pass
+        self.channel_name.value = f"{channel_name} at 7.0E"
+
+        # PROVID = 00 za BISS
+        self.provid.value = "00"
+
+    def addEmulator(self):
+        self.session.open(CiefpOscamEmulatorAdd)
 
     def protocolChanged(self, configElement):
         self.createSetup()
@@ -1822,26 +2022,22 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             getConfigListEntry(get_translation("protocol") + ":", self.protocol),
             getConfigListEntry(get_translation("device") + ":", self.device),
         ]
-        
-        # Dodaj DES key samo za Mgcamd
+
         if self.protocol.value == "mgcamd":
             self.list.append(getConfigListEntry(get_translation("deskey") + ":", self.deskey))
-        
-        # Opšte postavke
+
         self.list.extend([
             getConfigListEntry(get_translation("user") + ":", self.user),
             getConfigListEntry(get_translation("password") + ":", self.password),
         ])
-        
-        # CCCam specifične postavke
+
         if self.protocol.value in ["cccam", "cccam_mcs"]:
             self.list.extend([
                 getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
                 getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
                 getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive),
             ])
-        
-        # Napredne postavke
+
         self.list.extend([
             getConfigListEntry(get_translation("inactivity_timeout") + ":", self.inactivitytimeout),
             getConfigListEntry(get_translation("group") + ":", self.group),
@@ -1850,7 +2046,14 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             getConfigListEntry(get_translation("disable_crc_cws") + ":", self.disablecrccws),
             getConfigListEntry(get_translation("disable_crc_cws_only_for") + ":", self.disablecrccws_only_for)
         ])
-        
+
+        #Ispravljeno: SID i PROVID
+        self.list.extend([
+            getConfigListEntry(get_translation("sid") + ":", self.sid),
+            getConfigListEntry(get_translation("provid") + ":", self.provid),
+            getConfigListEntry(get_translation("channel_name") + ":", self.channel_name),
+        ])
+
         self["config"].list = self.list
         self["config"].l.setList(self.list)
 
@@ -1861,26 +2064,22 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
             f"protocol                      = {self.protocol.value}",
             f"device                        = {self.device.value}",
         ]
-        
-        # Mgcamd specifične postavke
+
         if self.protocol.value == "mgcamd":
             reader_lines.append(f"deskey                        = {self.deskey.value.strip()}")
-        
-        # Opšte postavke
+
         reader_lines.extend([
             f"user                          = {self.user.value}",
             f"password                      = {self.password.value}",
         ])
-        
-        # CCCam specifične postavke
+
         if self.protocol.value in ["cccam", "cccam_mcs"]:
             reader_lines.extend([
                 f"cccversion                    = {self.cccversion.value}",
                 f"cccmaxhops                    = {self.cccmaxhops.value}",
                 f"ccckeepalive                  = {self.ccckeepalive.value}",
             ])
-        
-        # Napredne postavke
+
         reader_lines.extend([
             f"inactivitytimeout             = {self.inactivitytimeout.value}",
             f"group                         = {self.group.value}",
@@ -1904,10 +2103,18 @@ class CiefpOscamServerAdd(ConfigListScreen, Screen):
         except Exception as e:
             print(f"Error saving reader: {str(e)}")
             self.session.open(MessageBox, get_translation("reader_add_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=5)
-    
-    def addEmulator(self):
-        self.session.open(CiefpOscamEmulatorAdd)        
 
+    def moveUp(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveUp)
+
+    def moveDown(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveDown)
+
+    def onSelectionChanged(self):
+        current = self["config"].getCurrent()
+        if not current:
+            return
+            
 class CiefpOscamServerReaderSelect(Screen):
     skin = """
     <screen name="CiefpOscamServerReaderSelect" position="center,center" size="900,800" title="..:: Izaberi čitač za brisanje ::..">
@@ -2039,12 +2246,14 @@ class CiefpOscamServerReaderSelect(Screen):
         print("DEBUG: closeWithCallback called")
         self.close(self.lines)
         
+            
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
-    <screen name="CiefpOscamEditorSettings" position="center,center" size="900,800" title="..:: Podešavanja ::..">
-        <widget name="config" position="10,10" size="880,650" scrollbarMode="showOnDemand" itemHeight="40" />
+    <screen name="CiefpOscamEditorSettings" position="center,center" size="1400,800" title="..:: Oscam Editor Settings ::..">
+        <widget name="config" position="10,10" size="980,650" scrollbarMode="showOnDemand" itemHeight="40" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/settings.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -2054,6 +2263,7 @@ class CiefpOscamEditorSettings(ConfigListScreen, Screen):
         self.setTitle(get_translation("title_settings"))
         self["key_green"] = Label(get_translation("save"))
         self["key_red"] = Label(get_translation("cancel"))
+        self["background"] = Pixmap()
         self["actions"] = ActionMap(["SetupActions", "ColorActions"], {
             "green": self.save,
             "red": self.close,
@@ -2088,7 +2298,7 @@ class CiefpOscamEcmInfo(Screen):
         <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background7.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/ecm_info.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -2164,13 +2374,13 @@ class CiefpOscamEcmInfo(Screen):
         return info
 
 class CiefpOscamUserEditor(Screen, ConfigListScreen):
-    skin = """<screen name="CiefpOscamUserEditor" position="center,center" size="1400,800" title="..:: OSCam Korisnik Editor ::..">
+    skin = """<screen name="CiefpOscamUserEditor" position="center,center" size="1400,800" title="..:: OSCam User Editor ::..">
         <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
         <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background10.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_user_editor.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session):
@@ -2380,10 +2590,10 @@ class CiefpOscamUserEditor(Screen, ConfigListScreen):
         self["config"].instance.moveSelection(self["config"].instance.moveDown)
 
 class CiefpOscamUserPreview(Screen):
-    skin = """<screen name="CiefpOscamUserPreview" position="center,center" size="1400,800" title="..:: Pregled oscam.user ::..">
+    skin = """<screen name="CiefpOscamUserPreview" position="center,center" size="1400,800" title="..:: oscam.user Preview ::..">
         <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
-        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/background11.png" position="1000,0" size="400,800" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_user_preview.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session, filepath):
@@ -2410,8 +2620,161 @@ class CiefpOscamUserPreview(Screen):
                 self["file_list"].setList([get_translation("file_not_exist")])
         except Exception as e:
             self["file_list"].setList([get_translation("file_read_error").format(str(e))])
+            
+class CiefpOscamSoftCamKeyPreview(Screen):
+    skin = """
+    <screen name="CiefpOscamSoftCamKeyPreview" position="center,center" size="1400,800" title="..:: SoftCam.key Preview ::..">
+        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/softcamkey_preview.png" position="1000,0" size="400,800" />
+    </screen>"""
 
+    def __init__(self, session):
+        Screen.__init__(self, session)
+        self.session = session
+        self.setTitle(get_translation("title_softcam_key_preview"))
+        self["file_list"] = MenuList([], enableWrapAround=True)
+        self["file_list"].l.setItemHeight(30)
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("delete"))
+        self["key_blue"] = Label("ADD KEY")
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
+            "red": self.close,
+            "green": self.saveFile,
+            "yellow": self.deleteKey,
+            "blue": self.addBissKey,
+            "cancel": self.close,
+            "up": self.moveUp,
+            "down": self.moveDown
+        }, -2)
+        self.lines = []
+        self.loadFile()
 
+    def loadFile(self):
+        dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+        softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
+        self.softcam_path = softcam_path
+        self.lines = []
+        try:
+            if os.path.exists(softcam_path):
+                with open(softcam_path, "r", encoding="utf-8") as f:
+                    self.lines = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            else:
+                self.lines = [get_translation("file_not_exist")]
+            self["file_list"].setList(self.lines)
+        except Exception as e:
+            self["file_list"].setList([get_translation("file_read_error").format(str(e))])
+
+    def addBissKey(self):
+        # Pokreće VirtualKeyBoard za unos BISS ključa
+        self.session.openWithCallback(self.bissKeyCallback, VirtualKeyBoard, title=get_translation("enter_new_key"),
+                                      text="0")
+
+    def bissKeyCallback(self, new_key):
+        if not new_key:
+            return
+
+        # Formatiraj ključ (ukloni razmake, velika slova)
+        formatted_key = new_key.replace(" ", "").upper()
+
+        # Vrijeme za komentar
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Dohvati aktivni servis
+        service = self.session.nav.getCurrentService()
+        info = service and service.info()
+        service_sid = info and info.getInfo(iServiceInformation.sSID) or -1
+        channel_info = info and info.getName() or "Unknown"
+
+        # Ako nema SID-a, koristi 0001
+        sid = "%04X" % service_sid if service_sid != -1 else "0001"
+
+        # Pokušaj da pročitaš ECM PID iz ecm.info
+        ecmpid = "1FFF"  # default
+        try:
+            ecm_path = "/tmp/ecm.info"
+            if os.path.exists(ecm_path):
+                with open(ecm_path, "r") as f:
+                    for line in f:
+                        if line.lower().startswith("pid:"):
+                            val = line.split(":", 1)[1].strip()
+                            if val:
+                                ecmpid = val.upper().replace("0X", "")
+                                ecmpid = ecmpid.zfill(4)
+                            break
+        except Exception as e:
+            print(f"[BISS] Error reading ecm.info:{e}")
+
+        # Spoji SID i ECM PID u formatu SIDECMPID
+        sid_ecmpid = f"{sid}{ecmpid}"
+
+        # Finalna linija za SoftCam.Key
+        line = f"F {sid_ecmpid} 00 {formatted_key} ; Added on {current_time} for {channel_info}\n"
+
+        try:
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
+            os.makedirs(os.path.dirname(softcam_path), exist_ok=True)
+
+            with open(softcam_path, "a", encoding="utf-8") as f:
+                f.write(line)
+
+            # Reload OSCam da bi se ključ odmah učitao
+            os.system("killall -HUP oscam")
+
+            # Osveži prikaz
+            self.loadFile()
+            
+            self.session.open(MessageBox, f"BISS key added for {channel_info}", MessageBox.TYPE_INFO, timeout=3)
+
+        except Exception as e:
+            self.session.open(MessageBox, f"Error while recording BISS key:{str(e)}", MessageBox.TYPE_ERROR, timeout=3)
+
+    def deleteKey(self):
+        current = self["file_list"].getCurrent()
+        if current and current != get_translation("file_not_exist") and not current.startswith(get_translation("file_read_error")):
+            # KORIGOVANO: getSelectedIndex() umjesto getIndex()
+            index = self["file_list"].getSelectedIndex()
+            # Koristimo session.open za MessageBox
+            self.session.openWithCallback(
+                lambda result: self.confirmDelete(index) if result else None,
+                MessageBox,
+                get_translation("confirm_delete_key"),
+                MessageBox.TYPE_YESNO
+            )
+        else:
+            self.session.open(MessageBox, get_translation("no_key_selected"), MessageBox.TYPE_ERROR, timeout=3)
+
+    def confirmDelete(self, index):
+        try:
+            del self.lines[index]
+            self["file_list"].setList(self.lines)
+            # Koristimo session.open za MessageBox
+            self.session.open(MessageBox, get_translation("key_deleted"), MessageBox.TYPE_INFO, timeout=3)
+        except Exception as e:
+            self.session.open(MessageBox, get_translation("delete_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=3)
+
+    def saveFile(self):
+        try:
+            with open(self.softcam_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(self.lines) + "\n")
+            os.system("killall -HUP oscam")  # Reload OSCam-a
+            self.session.open(MessageBox, get_translation("file_saved").format(self.softcam_path), MessageBox.TYPE_INFO, timeout=3)
+            self.close()
+        except Exception as e:
+            self.session.open(MessageBox, get_translation("write_error").format(self.softcam_path, str(e)), MessageBox.TYPE_ERROR, timeout=3)
+
+    def moveUp(self):
+        self["file_list"].up()
+
+    def moveDown(self):
+        self["file_list"].down()
+        
 def main(session, **kwargs):
     session.open(CiefpOscamEditorMain)
 
