@@ -121,7 +121,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.1"
+PLUGIN_VERSION = "1.2.2"
 
 def check_for_update(session):
     try:
@@ -2114,13 +2114,15 @@ class CiefpOscamServerAdd(Screen, ConfigListScreen):
         current = self["config"].getCurrent()
         if not current:
             return
-            
+
 class CiefpOscamServerReaderSelect(Screen):
     skin = """
-    <screen name="CiefpOscamServerReaderSelect" position="center,center" size="900,800" title="..:: Izaberi čitač za brisanje ::..">
-        <widget name="reader_list" position="10,10" size="880,650" font="Regular;26" scrollbarMode="showOnDemand" />
+    <screen name="CiefpOscamServerReaderSelect" position="center,center" size="1400,800" title="..:: Delete Reader ::..">
+        <widget name="reader_list" position="10,10" size="980,650" font="Regular;26" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08500" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/delete_reader.png" position="1000,0" size="400,800" />
     </screen>"""
 
     def __init__(self, session, lines):
@@ -2131,18 +2133,21 @@ class CiefpOscamServerReaderSelect(Screen):
         self.setTitle(get_translation("title_reader_select"))
         self["reader_list"] = MenuList([], enableWrapAround=True)
         self["reader_list"].l.setItemHeight(35)
-        self["key_red"] = Label(get_translation("delete"))
+        self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("delete"))
+        self["background"] = Pixmap()
         self["actions"] = ActionMap(["ColorActions", "SetupActions"], {
-            "red": self.deleteReader,
+            "red": self.closeWithCallback,
             "green": self.saveFile,
+            "yellow": self.deleteReader,
             "cancel": self.closeWithCallback,
             "ok": self.selectReader,
             "up": self.moveUp,
             "down": self.moveDown
         }, -2)
         print("DEBUG: ActionMap initialized with contexts: ['ColorActions', 'SetupActions']")
-        print("DEBUG: ActionMap bindings: red=deleteReader, green=saveFile, cancel=closeWithCallback, ok=selectReader, up=moveUp, down=moveDown")
+        print("DEBUG: ActionMap bindings: red=closeWithCallback, green=saveFile, yellow=deleteReader, cancel=closeWithCallback, ok=selectReader, up=moveUp, down=moveDown")
         self.loadReaders()
 
     def loadReaders(self):
@@ -2245,8 +2250,8 @@ class CiefpOscamServerReaderSelect(Screen):
     def closeWithCallback(self):
         print("DEBUG: closeWithCallback called")
         self.close(self.lines)
-        
-            
+
+      
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
     <screen name="CiefpOscamEditorSettings" position="center,center" size="1400,800" title="..:: Oscam Editor Settings ::..">
