@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: Edytor użytkownika OSCam ::..",
     "title_oscam_user_preview": "..:: Podgląd oscam.user ::..",
     "title_add_emulator": "..:: Dodaj Emulator ::..",
+    "edit_reader_title": "..:: Redagować Reader ::..",
     # Buttons/Menu
     "exit": "Wyjdź",
     "cancel": "Anuluj",
@@ -110,9 +111,12 @@ translations = {
     "on": "Wł",
     "off": "Wył",
     #FreeCCcam
-    "cccamia_free": "CCcamia Darmowy",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Darmowy",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Wybierz Źródło ::..",
     # ChoiceBox options
     "oscam_conf_editor": "Edytor OSCam Conf",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Dodaj czytnik",
     "add_emulator": "Dodaj emulator",
-    "select_reader": "Usuń czytnik",
+    "select_reader": "Usuń Edytuj Czytnik",
     "oscam_user_preview": "Podgląd użytkownika OSCam",
     "oscam_user": "OSCam User",
     "functions": "Funkcje",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Użytkownik Webif",
     "webif_password": "Hasło Webif",
     "refresh_interval": "Interwał odświeżania",
-    "enter_new_key": "Wprowadź klucz BISS"
+    "enter_new_key": "Wprowadź klucz BISS",
+    "enter_biss_key": "Wprowadź klucz BISS",
+    "line_type": "Typ linii",
+    "channel_specific": "Specyficzny kanał",
+    "add_comment": "Dodaj komentarz",
+    "placeholder": "Placeholder"
 }

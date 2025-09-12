@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: محرر مستخدم OSCam ::..",
     "title_oscam_user_preview": "..:: معاينة oscam.user ::..",
     "title_add_emulator": "..:: إضافة محاكي ::..",
+    "edit_reader_title": "..:: يحرر Reader ::..",
     # Buttons/Menu
     "exit": "خروج",
     "cancel": "إلغاء",
@@ -110,9 +111,12 @@ translations = {
     "on": "تشغيل",
     "off": "إيقاف",
     #FreeCCcam
-    "cccamia_free": "CCcamia مجاني",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV مجاني",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: حدد المصدر ::..",
     # ChoiceBox options
     "oscam_conf_editor": "محرر OSCam Conf",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "إضافة قارئ",
     "add_emulator": "إضافة محاكي",
-    "select_reader": "حذف قارئ",
+    "select_reader": "حذف تحرير القارئ",
     "oscam_user_preview": "معاينة مستخدم OSCam",
     "oscam_user": "OSCam User",
     "functions": "وظائف",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "مستخدم Webif",
     "webif_password": "كلمة مرور Webif",
     "refresh_interval": "فاصل التحديث",
-    "enter_new_key": "أدخل مفتاح BISS"
+    "enter_new_key": "أدخل مفتاح BISS",
+    "enter_biss_key": "أدخل مفتاح BISS",
+    "line_type": "نوع الخط",
+    "channel_specific": "قناة محددة",
+    "add_comment": "أضف تعليقًا",
+    "placeholder": "Placeholder"
 }

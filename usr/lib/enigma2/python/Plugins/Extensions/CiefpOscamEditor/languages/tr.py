@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: OSCam Kullanıcı Düzenleyici ::..",
     "title_oscam_user_preview": "..:: oscam.user Önizleme ::..",
     "title_add_emulator": "..:: Emülatör Ekle ::..",
+    "edit_reader_title": "..:: Düzenlemek Reader ::..",
     # Buttons/Menu
     "exit": "Çıkış",
     "cancel": "İptal",
@@ -110,9 +111,12 @@ translations = {
     "on": "Açık",
     "off": "Kapalı",
     #FreeCCcam
-    "cccamia_free": "CCcamia Ücretsiz",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Ücretsiz",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Kaynak Seç ::..",
     # ChoiceBox options
     "oscam_conf_editor": "OSCam Conf Düzenleyici",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Okuyucu Ekle",
     "add_emulator": "Emülatör Ekle",
-    "select_reader": "Okuyucu Sil",
+    "select_reader": "Sil Düzenle Okuyucu",
     "oscam_user_preview": "OSCam Kullanıcı Önizleme",
     "oscam_user": "OSCam User",
     "functions": "Fonksiyonlar",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Webif Kullanıcısı",
     "webif_password": "Webif Şifresi",
     "refresh_interval": "Yenileme Aralığı",
-    "enter_new_key": "BISS anahtarı girin"
+    "enter_new_key": "BISS anahtarı girin",
+    "enter_biss_key": "BISS anahtarı girin",
+    "line_type": "Çizgi Türü",
+    "channel_specific": "Kanala Özel",
+    "add_comment": "Yorum Ekle",
+    "placeholder": "Placeholder"
 }

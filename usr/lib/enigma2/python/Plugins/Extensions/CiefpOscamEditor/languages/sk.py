@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: OSCam User Editor ::..",
     "title_oscam_user_preview": "..:: oscam.user Náhľad ::..",
     "title_add_emulator": "..:: Pridať Emulátor ::..",
+    "edit_reader_title": "..:: Upraviť Reader ::..",
     # Buttons/Menu
     "exit": "Ukončiť",
     "cancel": "Zrušiť",
@@ -110,9 +111,12 @@ translations = {
     "on": "Zap",
     "off": "Vyp",
     #FreeCCcam
-    "cccamia_free": "CCcamia Free",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Free",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Vyberte Zdroj ::..",
     # ChoiceBox options
     "oscam_conf_editor": "OSCam Conf Editor",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Pridať Reader",
     "add_emulator": "Pridať Emulátor",
-    "select_reader": "Vymazať Reader",
+    "select_reader": "Odstrániť Upraviť Reader",
     "oscam_user_preview": "OSCam User Náhľad",
     "oscam_user": "OSCam User",
     "functions": "Funkcie",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Webif Používateľ",
     "webif_password": "Webif Heslo",
     "refresh_interval": "Interval obnovovania",
-    "enter_new_key": "Zadajte BISS Kľúč"
+    "enter_new_key": "Zadajte BISS Kľúč",
+    "enter_biss_key": "Zadajte BISS Kľúč",
+    "line_type": "Typ čiary",
+    "channel_specific": "Špecifické pre kanál",
+    "add_comment": "Pridať komentár",
+    "placeholder": "Placeholder"
 }

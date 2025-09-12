@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: Επεξεργαστής OSCam User ::..",
     "title_oscam_user_preview": "..:: Προεπισκόπηση oscam.user ::..",
     "title_add_emulator": "..:: Προσθήκη Προσομοιωτή ::..",
+    "edit_reader_title": "..:: Εκδίδω Reader ::..",
     # Buttons/Menu
     "exit": "Έξοδος",
     "cancel": "Ακύρωση",
@@ -110,9 +111,12 @@ translations = {
     "on": "Ενεργό",
     "off": "Ανενεργό",
     #FreeCCcam
-    "cccamia_free": "CCcamia Δωρεάν",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Δωρεάν",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Επιλογή Πηγής ::..",
     # ChoiceBox options
     "oscam_conf_editor": "Επεξεργαστής OSCam Conf",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Προσθήκη Reader",
     "add_emulator": "Προσθήκη Προσομοιωτή",
-    "select_reader": "Διαγραφή Reader",
+    "select_reader": "Διαγραφή Επεξεργασία Αναγνώστη",
     "oscam_user_preview": "Προεπισκόπηση OSCam User",
     "oscam_user": "OSCam User",
     "functions": "Λειτουργίες",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Χρήστης Webif",
     "webif_password": "Κωδικός Webif",
     "refresh_interval": "Διάστημα Ανανέωσης",
-    "enter_new_key": "Εισαγωγή Κλειδιού BISS"
+    "enter_new_key": "Εισαγωγή Κλειδιού BISS",
+    "enter_biss_key": "Εισαγωγή Κλειδιού BISS",
+    "line_type": "Τύπος γραμμής",
+    "channel_specific": "Ειδικό για το κανάλι",
+    "add_comment": "Προσθήκη σχολίου",
+    "placeholder": "Placeholder"
 }

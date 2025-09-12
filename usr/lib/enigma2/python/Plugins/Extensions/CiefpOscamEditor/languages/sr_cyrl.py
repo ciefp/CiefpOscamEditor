@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: OSCam User Editor ::..",
     "title_oscam_user_preview": "..:: Преглед oscam.user ::..",
     "title_add_emulator": "..:: Додај Емулатор ::..",
+    "edit_reader_title": "..:: Измени Reader ::..",
     # Buttons/Menu
     "exit": "Изађи",
     "cancel": "Откажи",
@@ -110,9 +111,12 @@ translations = {
     "on": "Укљ",
     "off": "Искљ",
     #FreeCCcam
-    "cccamia_free": "CCcamia Бесплатно",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Бесплатно",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Изабери Извор ::..",
     # ChoiceBox options
     "oscam_conf_editor": "OSCam Conf Editor",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Додај Reader",
     "add_emulator": "Додај Емулатор",
-    "select_reader": "Обриши Reader",
+    "select_reader": "Обриши Уреди Reader",
     "oscam_user_preview": "Преглед OSCam User",
     "oscam_user": "OSCam User",
     "functions": "Функције",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Webif Корисник",
     "webif_password": "Webif Лозинка",
     "refresh_interval": "Интервал Освежавања",
-    "enter_new_key": "Унеси BISS Кључ"
+    "enter_new_key": "Унеси BISS Кључ",
+    "enter_biss_key": "Enter BISS Key",
+    "line_type": "Тип линије",
+    "channel_specific": "Специфично за канал",
+    "add_comment": "Додај коментар",
+    "placeholder": "Placeholder"
 }

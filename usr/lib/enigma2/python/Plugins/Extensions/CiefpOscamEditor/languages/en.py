@@ -15,6 +15,7 @@ translations = {
     "title_oscam_user_editor": "..:: OSCam User Editor ::..",
     "title_oscam_user_preview": "..:: oscam.user Preview ::..",
     "title_add_emulator": "..:: Add Emulator ::..",
+    "edit_reader_title": "..:: Edit Reader ::..",
     # Buttons/Menu
     "exit": "Exit",
     "cancel": "Cancel",
@@ -110,9 +111,12 @@ translations = {
     "on": "On",
     "off": "Off",
     #FreeCCcam
-    "cccamia_free": "CCcamia Free",
-    "cccam_premium": "CCcam Premium",
-    "cccamiptv_free": "CCcamIPTV Free",
+    "cccamia_free": "Free CCcamia",
+    "cccam_premium": "Free CCcam Premium",
+    "cccamiptv_free": "Free CCcam IPTV",
+    "cccamgalaxy_free": "Free CCcam Galaxy",
+    "cccam_net_free": "Free CCcam net",
+    "cccamsate_free": "Free CCcam Sate",
     "select_source": "..:: Select Source ::..",
     # ChoiceBox options
     "oscam_conf_editor": "OSCam Conf Editor",
@@ -125,7 +129,7 @@ translations = {
     "oscam_server": "OSCam Server",
     "add_reader": "Add Reader",
     "add_emulator": "Add Emulator",
-    "select_reader": "Delete Reader",
+    "select_reader": "Delete Edit Reader",
     "oscam_user_preview": "OSCam User Preview",
     "oscam_user": "OSCam User",
     "functions": "Functions",
@@ -177,5 +181,10 @@ translations = {
     "webif_user": "Webif User",
     "webif_password": "Webif Password",
     "refresh_interval": "Refresh Interval",
-    "enter_new_key": "Enter BISS Key"
+    "enter_new_key": "Enter BISS Key",
+    "enter_biss_key": "Enter BISS Key",
+    "line_type": "Line Type",
+    "channel_specific": "Channel Specific",
+    "add_comment": "Add Comment",
+    "placeholder": "Placeholder"
 }

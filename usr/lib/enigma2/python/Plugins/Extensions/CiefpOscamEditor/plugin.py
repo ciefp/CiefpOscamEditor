@@ -121,7 +121,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.2"
+PLUGIN_VERSION = "1.2.3"
 
 def check_for_update(session):
     try:
@@ -485,7 +485,7 @@ class CiefpOscamStatus(Screen):
 
 class CiefpOscamConfPreview(Screen):
     skin = """<screen name="CiefpOscamConfPreview" position="center,center" size="1400,800" title="..:: oscam.conf Preview ::..">
-        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="file_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_conf_preview.png" position="1000,0" size="400,800" />
@@ -524,7 +524,7 @@ class CiefpOscamConfPreview(Screen):
 
 class CiefpOscamConfEditor(Screen, ConfigListScreen):
     skin = """<screen name="CiefpOscamConfEditor" position="center,center" size="1400,800" title="..:: OSCam Conf ::..">
-        <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="config" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
@@ -1040,7 +1040,10 @@ class CiefpOscamEditorMain(Screen):
         choices = [
             (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
             (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
-            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content")
+            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content"),
+            (get_translation("cccamgalaxy_free"), "https://cccamgalaxy.com/"),
+            (get_translation("cccam_net_free"), "https://cccam.net/freecccam"),
+            (get_translation("cccamsate_free"), "https://cccamsate.com/free")
         ]
 
         self.session.openWithCallback(
@@ -1267,7 +1270,7 @@ class CiefpOscamEditorMain(Screen):
 class CiefpOscamInfo(Screen):
     skin = """
     <screen name="CiefpOscamInfo" position="center,center" size="1400,800" title="..:: OSCam Info ::..">
-        <widget name="info_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="info_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_info.png" position="1000,0" size="400,800" />
@@ -1515,7 +1518,7 @@ class CiefpOscamEditorAdd(ConfigListScreen, Screen):
 class CiefpOscamEditorPreview(Screen):
     skin = """
     <screen name="CiefpOscamEditorPreview" position="center,center" size="1400,800" title="..:: oscam.dvbapi Preview ::..">
-        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="file_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_blue" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
@@ -1592,7 +1595,7 @@ class CiefpOscamEditorPreview(Screen):
 class CiefpOscamServerPreview(Screen):
     skin = """
     <screen name="CiefpOscamServerPreview" position="center,center" size="1400,800" title="..:: oscam.server Preview ::..">
-        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="file_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
@@ -1642,7 +1645,7 @@ class CiefpOscamServerPreview(Screen):
 
     def deleteReader(self):
         self.session.openWithCallback(self.updateLines, CiefpOscamServerReaderSelect, self.lines)
-
+    
     def addFreeReader(self):
         def onSourceSelected(selected):
             if not selected or not selected[1]:
@@ -1654,7 +1657,7 @@ class CiefpOscamServerPreview(Screen):
                 html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
-                    self.session.open(MessageBox, "C-line not found!", MessageBox.TYPE_ERROR, timeout=5)
+                    self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
                     return
 
                 server, port, user, password = match.groups()
@@ -1689,18 +1692,21 @@ class CiefpOscamServerPreview(Screen):
                 os.system("killall -HUP oscam")
                 self.session.open(
                     MessageBox,
-                    f"Reader '{label_name}' added from '{selected_name}', Oscam reloaded.",
+                    f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
                     MessageBox.TYPE_INFO,
                     timeout=5
                 )
 
             except Exception as e:
-                self.session.open(MessageBox, f"Error: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
+                self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
 
         choices = [
             (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
             (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
-            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content")
+            (get_translation("cccamiptv_free"), "https://cccamiptv.tv/cccamfree/#page-content"),
+            (get_translation("cccamgalaxy_free"), "https://cccamgalaxy.com/"),
+            (get_translation("cccam_net_free"), "https://cccam.net/freecccam"),
+            (get_translation("cccamsate_free"), "https://cccamsate.com/free")
         ]
 
         self.session.openWithCallback(
@@ -2031,13 +2037,6 @@ class CiefpOscamServerAdd(Screen, ConfigListScreen):
             getConfigListEntry(get_translation("password") + ":", self.password),
         ])
 
-        if self.protocol.value in ["cccam", "cccam_mcs"]:
-            self.list.extend([
-                getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
-                getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
-                getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive),
-            ])
-
         self.list.extend([
             getConfigListEntry(get_translation("inactivity_timeout") + ":", self.inactivitytimeout),
             getConfigListEntry(get_translation("group") + ":", self.group),
@@ -2047,12 +2046,13 @@ class CiefpOscamServerAdd(Screen, ConfigListScreen):
             getConfigListEntry(get_translation("disable_crc_cws_only_for") + ":", self.disablecrccws_only_for)
         ])
 
-        #Ispravljeno: SID i PROVID
-        self.list.extend([
-            getConfigListEntry(get_translation("sid") + ":", self.sid),
-            getConfigListEntry(get_translation("provid") + ":", self.provid),
-            getConfigListEntry(get_translation("channel_name") + ":", self.channel_name),
-        ])
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            self.list.extend([
+                getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
+                getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
+                getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive),
+            ])
+
 
         self["config"].list = self.list
         self["config"].l.setList(self.list)
@@ -2073,13 +2073,6 @@ class CiefpOscamServerAdd(Screen, ConfigListScreen):
             f"password                      = {self.password.value}",
         ])
 
-        if self.protocol.value in ["cccam", "cccam_mcs"]:
-            reader_lines.extend([
-                f"cccversion                    = {self.cccversion.value}",
-                f"cccmaxhops                    = {self.cccmaxhops.value}",
-                f"ccckeepalive                  = {self.ccckeepalive.value}",
-            ])
-
         reader_lines.extend([
             f"inactivitytimeout             = {self.inactivitytimeout.value}",
             f"group                         = {self.group.value}",
@@ -2088,6 +2081,13 @@ class CiefpOscamServerAdd(Screen, ConfigListScreen):
             f"disablecrccws                 = {self.disablecrccws.value}",
             f"disablecrccws_only_for        = {self.disablecrccws_only_for.value}"
         ])
+
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            reader_lines.extend([
+                f"cccversion                    = {self.cccversion.value}",
+                f"cccmaxhops                    = {self.cccmaxhops.value}",
+                f"ccckeepalive                  = {self.ccckeepalive.value}",
+            ])
 
         dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
         server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
@@ -2122,6 +2122,7 @@ class CiefpOscamServerReaderSelect(Screen):
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08500" foregroundColor="#000000" />
+        <widget name="key_blue" position="760,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#13389F" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/delete_reader.png" position="1000,0" size="400,800" />
     </screen>"""
 
@@ -2136,18 +2137,20 @@ class CiefpOscamServerReaderSelect(Screen):
         self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("save"))
         self["key_yellow"] = Label(get_translation("delete"))
+        self["key_blue"] = Label(get_translation("edit"))
         self["background"] = Pixmap()
         self["actions"] = ActionMap(["ColorActions", "SetupActions"], {
             "red": self.closeWithCallback,
             "green": self.saveFile,
             "yellow": self.deleteReader,
+            "blue": self.editReader,
             "cancel": self.closeWithCallback,
             "ok": self.selectReader,
             "up": self.moveUp,
             "down": self.moveDown
         }, -2)
         print("DEBUG: ActionMap initialized with contexts: ['ColorActions', 'SetupActions']")
-        print("DEBUG: ActionMap bindings: red=closeWithCallback, green=saveFile, yellow=deleteReader, cancel=closeWithCallback, ok=selectReader, up=moveUp, down=moveDown")
+        print("DEBUG: ActionMap bindings: red=closeWithCallback, green=saveFile, yellow=deleteReader, blue=editReader, cancel=closeWithCallback, ok=selectReader, up=moveUp, down=moveDown")
         self.loadReaders()
 
     def loadReaders(self):
@@ -2231,6 +2234,29 @@ class CiefpOscamServerReaderSelect(Screen):
         else:
             print(f"DEBUG: Deletion of reader '{reader_label}' cancelled")
 
+    def editReader(self):
+        print("DEBUG: editReader called")
+        current_index = self["reader_list"].getSelectionIndex()
+        if current_index >= 0 and current_index < len(self.readers) and self.readers[current_index][0]:
+            reader_label, start_index, end_index = self.readers[current_index]
+            reader_lines = self.lines[start_index:end_index]
+            self.session.openWithCallback(
+                self.updateReaderCallback,
+                CiefpOscamServerEdit,
+                reader_lines,
+                start_index,
+                end_index
+            )
+        else:
+            self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
+
+    def updateReaderCallback(self, result):
+        if result:
+            start_index, end_index, new_lines = result
+            self.lines[start_index:end_index] = new_lines
+            self.loadReaders()
+            self.session.open(MessageBox, get_translation("reader_updated"), MessageBox.TYPE_INFO, timeout=5)
+
     def saveFile(self):
         print("DEBUG: saveFile called")
         dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
@@ -2251,7 +2277,219 @@ class CiefpOscamServerReaderSelect(Screen):
         print("DEBUG: closeWithCallback called")
         self.close(self.lines)
 
-      
+class CiefpOscamServerEdit(Screen, ConfigListScreen):
+    skin = """<screen name="CiefpOscamServerEdit" position="center,center" size="1400,800" title="..:: Edit Reader ::..">
+        <widget name="config" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" itemHeight="30" />
+        <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
+        <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
+        <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
+        <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/edit_reader.png" position="1000,0" size="400,800" />
+    </screen>"""
+
+    def __init__(self, session, reader_lines, start_index, end_index):
+        Screen.__init__(self, session)
+        ConfigListScreen.__init__(self, [])
+        self.session = session
+        self.reader_lines = reader_lines
+        self.start_index = start_index
+        self.end_index = end_index
+        self.setTitle(get_translation("edit_reader_title"))
+
+        self["key_red"] = Label(get_translation("exit"))
+        self["key_green"] = Label(get_translation("save"))
+        self["key_yellow"] = Label(get_translation("add_reader"))
+        self["background"] = Pixmap()
+        self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
+            "red": self.cancel,
+            "green": self.save,
+            "yellow": self.addReader,
+            "cancel": self.cancel,
+            "up": self.moveUp,
+            "down": self.moveDown
+        }, -2)
+
+        # Osnovne postavke čitača
+        self.label = ConfigText(default="", fixed_size=False)
+        self.protocol = ConfigSelection(default="cccam", choices=[
+            ("cccam", get_translation("protocol") + ": cccam"),
+            ("cccam_mcs", get_translation("protocol") + ": cccam_mcs"),
+            ("mgcamd", get_translation("protocol") + ": mgcamd")
+        ])
+        self.device = ConfigText(default="", fixed_size=False)
+        self.user = ConfigText(default="", fixed_size=False)
+        self.password = ConfigText(default="", fixed_size=False)
+
+        # Mgcamd specifične postavke
+        self.deskey = ConfigText(default="01 02 03 04 05 06 07 08 09 10 11 12 13 14", fixed_size=False)
+
+        # CCCam specifične postavke
+        self.cccversion = ConfigSelection(default="2.3.0", choices=[
+            ("2.0.11", "2.0.11"), ("2.1.1", "2.1.1"), ("2.1.2", "2.1.2"),
+            ("2.1.3", "2.1.3"), ("2.1.4", "2.1.4"), ("2.2.0", "2.2.0"),
+            ("2.2.1", "2.2.1"), ("2.3.0", "2.3.0"), ("2.3.1", "2.3.1"),
+            ("2.3.2", "2.3.2")
+        ])
+        self.cccmaxhops = ConfigSelection(default="2", choices=[
+            ("1", "1"), ("2", "2"), ("3", "3")
+        ])
+        self.ccckeepalive = ConfigSelection(default="1", choices=[
+            ("0", "0"), ("1", "1")
+        ])
+
+        # Napredne postavke
+        self.inactivitytimeout = ConfigSelection(default="-1", choices=[
+            ("-1", "-1"), ("0", "0"), ("30", "30"), ("60", "60")
+        ])
+        self.group = ConfigSelection(default="1", choices=[
+            ("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"),
+            ("6", "6"), ("7", "7"), ("8", "8"), ("9", "9"), ("10", "10")
+        ])
+        self.cacheex = ConfigSelection(default="1", choices=[
+            ("0", "0"), ("1", "1"), ("2", "2"), ("3", "3")
+        ])
+        self.emmcache = ConfigSelection(default="1,3,2,0", choices=[
+            ("1,3,2,0", "1,3,2,0"),
+            ("1,5,2,0", "1,5,2,0"),
+            ("1,1,2,0", "1,1,2,0")
+        ])
+        self.disablecrccws = ConfigSelection(default="0", choices=[
+            ("0", "0"), ("1", "1")
+        ])
+        self.disablecrccws_only_for = ConfigText(
+            default="0E00:000000;0500:050F00,030B00;09C4:000000;098C:000000;098D:000000;091F:000000",
+            fixed_size=False
+        )
+
+        self.protocol.addNotifier(self.protocolChanged, initial_call=True)
+        self.parseReaderLines()
+        self.createSetup()
+        self["config"].onSelectionChanged.append(self.onSelectionChanged)
+
+    def parseReaderLines(self):
+        for line in self.reader_lines:
+            line = line.strip()
+            if "=" in line:
+                key, value = [part.strip() for part in line.split("=", 1)]
+                key_lower = key.lower()
+                if key_lower == "label":
+                    self.label.value = value
+                elif key_lower == "protocol":
+                    self.protocol.value = value
+                elif key_lower == "device":
+                    self.device.value = value
+                elif key_lower == "user":
+                    self.user.value = value
+                elif key_lower == "password":
+                    self.password.value = value
+                elif key_lower == "deskey":
+                    self.deskey.value = value
+                elif key_lower == "cccversion":
+                    self.cccversion.value = value
+                elif key_lower == "cccmaxhops":
+                    self.cccmaxhops.value = value
+                elif key_lower == "ccckeepalive":
+                    self.ccckeepalive.value = value
+                elif key_lower == "inactivitytimeout":
+                    self.inactivitytimeout.value = value
+                elif key_lower == "group":
+                    self.group.value = value
+                elif key_lower == "cacheex":
+                    self.cacheex.value = value
+                elif key_lower == "emmcache":
+                    self.emmcache.value = value
+                elif key_lower == "disablecrccws":
+                    self.disablecrccws.value = value
+                elif key_lower == "disablecrccws_only_for":
+                    self.disablecrccws_only_for.value = value
+
+    def addReader(self):
+        self.session.open(CiefpOscamServerAdd)
+
+    def protocolChanged(self, configElement):
+        self.createSetup()
+
+    def createSetup(self):
+        self.list = [
+            getConfigListEntry(get_translation("label") + ":", self.label),
+            getConfigListEntry(get_translation("protocol") + ":", self.protocol),
+            getConfigListEntry(get_translation("device") + ":", self.device),
+        ]
+
+        if self.protocol.value == "mgcamd":
+            self.list.append(getConfigListEntry(get_translation("deskey") + ":", self.deskey))
+
+        self.list.extend([
+            getConfigListEntry(get_translation("user") + ":", self.user),
+            getConfigListEntry(get_translation("password") + ":", self.password),
+        ])
+
+        self.list.extend([
+            getConfigListEntry(get_translation("inactivity_timeout") + ":", self.inactivitytimeout),
+            getConfigListEntry(get_translation("group") + ":", self.group),
+            getConfigListEntry(get_translation("cacheex") + ":", self.cacheex),
+            getConfigListEntry(get_translation("emm_cache") + ":", self.emmcache),
+            getConfigListEntry(get_translation("disable_crc_cws") + ":", self.disablecrccws),
+            getConfigListEntry(get_translation("disable_crc_cws_only_for") + ":", self.disablecrccws_only_for)
+        ])
+
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            self.list.extend([
+                getConfigListEntry(get_translation("ccc_version") + ":", self.cccversion),
+                getConfigListEntry(get_translation("ccc_max_hops") + ":", self.cccmaxhops),
+                getConfigListEntry(get_translation("ccc_keep_alive") + ":", self.ccckeepalive),
+            ])
+
+        self["config"].list = self.list
+        self["config"].l.setList(self.list)
+
+    def save(self):
+        new_lines = [
+            "[reader]",
+            f"label                         = {self.label.value}",
+            f"protocol                      = {self.protocol.value}",
+            f"device                        = {self.device.value}",
+        ]
+
+        if self.protocol.value == "mgcamd":
+            new_lines.append(f"deskey                        = {self.deskey.value.strip()}")
+
+        new_lines.extend([
+            f"user                          = {self.user.value}",
+            f"password                      = {self.password.value}",
+        ])
+
+        new_lines.extend([
+            f"inactivitytimeout             = {self.inactivitytimeout.value}",
+            f"group                         = {self.group.value}",
+            f"cacheex                       = {self.cacheex.value}",
+            f"emmcache                      = {self.emmcache.value}",
+            f"disablecrccws                 = {self.disablecrccws.value}",
+            f"disablecrccws_only_for        = {self.disablecrccws_only_for.value}"
+        ])
+
+        if self.protocol.value in ["cccam", "cccam_mcs"]:
+            new_lines.extend([
+                f"cccversion                    = {self.cccversion.value}",
+                f"cccmaxhops                    = {self.cccmaxhops.value}",
+                f"ccckeepalive                  = {self.ccckeepalive.value}",
+            ])
+
+        self.close((self.start_index, self.end_index, new_lines))
+
+    def cancel(self):
+        self.close(None)
+
+    def moveUp(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveUp)
+
+    def moveDown(self):
+        self["config"].instance.moveSelection(self["config"].instance.moveDown)
+
+    def onSelectionChanged(self):
+        current = self["config"].getCurrent()
+        if not current:
+            return
+            
 class CiefpOscamEditorSettings(ConfigListScreen, Screen):
     skin = """
     <screen name="CiefpOscamEditorSettings" position="center,center" size="1400,800" title="..:: Oscam Editor Settings ::..">
@@ -2448,7 +2686,7 @@ class CiefpOscamUserEditor(Screen, ConfigListScreen):
         self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("save"))
         self["key_yellow"] = Label(get_translation("preview"))
-        self["key_blue"] = Label(get_translation("oscam_user"))
+        self["key_blue"] = Label(get_translation("placeholder"))
         self["background"] = Pixmap()
         self["actions"] = ActionMap(["SetupActions", "ColorActions", "DirectionActions"], {
             "red": self.close,
@@ -2596,7 +2834,7 @@ class CiefpOscamUserEditor(Screen, ConfigListScreen):
 
 class CiefpOscamUserPreview(Screen):
     skin = """<screen name="CiefpOscamUserPreview" position="center,center" size="1400,800" title="..:: oscam.user Preview ::..">
-        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="file_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="background" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/oscam_user_preview.png" position="1000,0" size="400,800" />
     </screen>"""
@@ -2629,7 +2867,7 @@ class CiefpOscamUserPreview(Screen):
 class CiefpOscamSoftCamKeyPreview(Screen):
     skin = """
     <screen name="CiefpOscamSoftCamKeyPreview" position="center,center" size="1400,800" title="..:: SoftCam.key Preview ::..">
-        <widget name="file_list" position="10,10" size="980,740" font="Regular;24" scrollbarMode="showOnDemand" />
+        <widget name="file_list" position="10,10" size="980,720" font="Regular;24" scrollbarMode="showOnDemand" />
         <widget name="key_red" position="10,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#9F1313" foregroundColor="#000000" />
         <widget name="key_green" position="260,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#1F771F" foregroundColor="#000000" />
         <widget name="key_yellow" position="510,750" size="240,40" font="Bold;20" halign="center" valign="center" backgroundColor="#A08000" foregroundColor="#000000" />
