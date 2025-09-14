@@ -46,6 +46,387 @@ import xml.etree.ElementTree as ET
 from html import unescape
 import subprocess
 
+
+def restart_oscam():
+    """Restart OSCam softcam-a sa full podrškom za sve Enigma2 image-ove"""
+    try:
+        print("[CiefpOscamEditor] Pokrećem restart OSCam-a...")
+
+        # Prvo pokušaj sa standardnim Enigma2 načinom za moderne image-ove
+        try:
+            from Screens.Standby import TryQuitMainloop
+            from boxbranding import getImageDistro
+
+            image_distro = getImageDistro().lower()
+            print(f"[CiefpOscamEditor] Detektovan image: {image_distro}")
+
+            modern_images = ('openatv', 'openbh', 'openvix', 'openeight', 'openpli',
+                             'egami', 'pure2', 'openhdf', 'opendroid', 'openspa')
+
+            if image_distro in modern_images:
+                try:
+                    from Screens.Standby import QUIT_RESTART_SOFTCAM
+                    print("[CiefpOscamEditor] Pokušavam TryQuitMainloop metod...")
+                    TryQuitMainloop(QUIT_RESTART_SOFTCAM)
+                    print(f"[CiefpOscamEditor] OSCam restartovan preko TryQuitMainloop za {image_distro}")
+                    return True
+                except ImportError:
+                    print("[CiefpOscamEditor] QUIT_RESTART_SOFTCAM nije dostupan")
+                    pass
+        except Exception as e:
+            print(f"[CiefpOscamEditor] Greška pri detekciji image-a: {str(e)}")
+            image_distro = "unknown"
+
+        # Dobij informacije o OSCam verziji
+        oscam_info = get_oscam_info()
+        config_dir = oscam_info.get("config_dir", "")
+        print(f"[CiefpOscamEditor] Config dir: {config_dir}")
+
+        # Odredi OSCam varijantu na osnovu config direktorijuma
+        oscam_variant = "oscam"
+        variant_suffix = ""
+        if "oscam-emu" in config_dir:
+            oscam_variant = "oscam-emu"
+            variant_suffix = "emu"
+        elif "oscam-master" in config_dir:
+            oscam_variant = "oscam-master"
+            variant_suffix = "master"
+        elif "oscam-smod" in config_dir:
+            oscam_variant = "oscam-smod"
+            variant_suffix = "smod"
+        elif "oscamicamnew" in config_dir:
+            oscam_variant = "oscamicamnew"
+            variant_suffix = "icamnew"
+
+        print(f"[CiefpOscamEditor] OSCam varijanta: {oscam_variant}")
+
+        # Image-specific restart procedure
+        if image_distro == "openpli":
+            print("[CiefpOscamEditor] Koristim OpenPLI metod...")
+            return openpli_restart(oscam_variant, config_dir)
+
+        elif image_distro == "pure2":
+            print("[CiefpOscamEditor] Koristim Pure2 metod...")
+            return pure2_restart(oscam_variant, variant_suffix)
+
+        elif image_distro == "openvix":
+            print("[CiefpOscamEditor] Koristim OpenViX metod...")
+            return openvix_restart(oscam_variant, variant_suffix, config_dir)
+
+        elif image_distro in ("openatv", "openhdf"):
+            print(f"[CiefpOscamEditor] Koristim {image_distro} metod...")
+            # OPENATV KORISTI INIT SKRIPTU KAO OPENVIX!
+            return openvix_restart(oscam_variant, variant_suffix, config_dir)
+
+        else:
+            print("[CiefpOscamEditor] Koristim generički metod...")
+            return generic_restart(oscam_variant, config_dir)
+
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Critical error: {str(e)}")
+        # Hitni fallback
+        return emergency_restart()
+
+
+def openvix_restart(oscam_variant, variant_suffix, config_dir):
+    """OpenViX specific restart sa poboljšanom detekcijom"""
+    try:
+        print(f"[CiefpOscamEditor] OpenViX restart for: {oscam_variant}")
+
+        # Prvo probaj da nađeš tačnu init skriptu
+        cam_name = oscam_variant
+        if "emu" in oscam_variant.lower():
+            cam_name = "oscam-emu"  # Standardno ime za OpenViX
+
+        init_script = f"/etc/init.d/softcam.{cam_name}"
+
+        if os.path.exists(init_script):
+            print(f"[CiefpOscamEditor] Found OpenViX init script: {init_script}")
+
+            # Prvo stop pa start za čist restart
+            stop_result = os.system(f"{init_script} stop >/dev/null 2>&1")
+            os.system("sleep 2")
+
+            # Očisti sve preostale procese
+            os.system(f"killall {oscam_variant} {cam_name} 2>/dev/null")
+            os.system("sleep 1")
+
+            # Start
+            start_result = os.system(f"{init_script} start >/dev/null 2>&1")
+            os.system("sleep 3")
+
+            # Proveri status
+            status_result = os.system(f"{init_script} status >/dev/null 2>&1")
+
+            if status_result == 0:
+                print(f"[CiefpOscamEditor] OSCam restartovan OpenViX init skriptom")
+                return True
+
+        # Probaj druge init skripte
+        other_scripts = [
+            f"/etc/init.d/softcam.{variant_suffix}",
+            f"/etc/init.d/{oscam_variant}",
+            "/etc/init.d/softcam"
+        ]
+
+        for script in other_scripts:
+            if os.path.exists(script):
+                print(f"[CiefpOscamEditor] Trying script: {script}")
+                result = os.system(f"{script} restart >/dev/null 2>&1")
+                os.system("sleep 3")
+
+                if result == 0:
+                    print(f"[CiefpOscamEditor] OSCam restartovan sa: {script}")
+                    return True
+
+        # Manual restart za OpenViX
+        print(f"[CiefpOscamEditor] Using manual OpenViX restart...")
+
+        # Pronađi binarnu datoteku
+        binary_paths = [
+            f"/usr/softcams/{oscam_variant}",
+            f"/usr/softcams/{cam_name}",
+            f"/usr/bin/{oscam_variant}",
+            f"/usr/bin/{cam_name}"
+        ]
+
+        oscam_bin = None
+        for path in binary_paths:
+            if os.path.exists(path):
+                oscam_bin = path
+                break
+
+        if not oscam_bin:
+            print(f"[CiefpOscamEditor] Binary not found, using fallback")
+            return generic_restart(oscam_variant, config_dir)
+
+        # Pronađi config direktorijum
+        config_dirs = [
+            f"/etc/tuxbox/config/{cam_name}",
+            f"/etc/tuxbox/config/{oscam_variant}",
+            "/etc/tuxbox/config",
+            "/etc/oscam",
+            config_dir
+        ]
+
+        actual_config_dir = config_dir
+        for dir in config_dirs:
+            if os.path.exists(dir):
+                actual_config_dir = dir
+                break
+
+        # Stop sve instance
+        os.system(f"killall {oscam_variant} {cam_name} 2>/dev/null")
+        os.system("sleep 2")
+
+        # Očisti PID fajlove i temp
+        pid_file = f"/var/tmp/{oscam_variant}.pid"
+        os.system(f"rm -f {pid_file} /var/tmp/{cam_name}.pid 2>/dev/null")
+        os.system("rm -rf /tmp/.oscam /tmp/oscam* 2>/dev/null")
+
+        # Start komanda kao u OpenViX init skripti
+        cmd = f"ulimit -s 1024 && {oscam_bin} --config-dir {actual_config_dir} --daemon --pidfile {pid_file} --restart 2 >/dev/null 2>&1"
+        result = os.system(cmd)
+
+        os.system("sleep 3")
+
+        # Proveri da li radi
+        pid_check = os.system(f"pidof {oscam_variant} >/dev/null 2>&1")
+
+        if pid_check == 0:
+            print(f"[CiefpOscamEditor] OSCam uspešno restartovan manualno")
+            return True
+        else:
+            print(f"[CiefpOscamEditor] Manual restart failed, trying generic")
+            return generic_restart(oscam_variant, actual_config_dir)
+
+    except Exception as e:
+        print(f"[CiefpOscamEditor] OpenViX restart error: {str(e)}")
+        return generic_restart(oscam_variant, config_dir)
+
+def openpli_restart(oscam_variant, config_dir):
+    """OpenPLI specific restart"""
+    try:
+        pid_file = "/tmp/oscam-emu.pid" if oscam_variant == "oscam-emu" else f"/tmp/{oscam_variant}.pid"
+        config_dir_param = f"--config-dir {config_dir}" if config_dir != "Unknown" else f"--config-dir /etc/tuxbox/config/{oscam_variant}"
+        
+        print(f"[CiefpOscamEditor] Stopping {oscam_variant}...")
+        # Stop (OpenPLI style)
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, 'r') as f:
+                    pid = f.read().strip()
+                    os.system(f"kill {pid} 2>/dev/null")
+                    print(f"[CiefpOscamEditor] Killed process {pid}")
+            except:
+                pass
+        
+        os.system(f"killall /usr/bin/{oscam_variant} 2>/dev/null")
+        os.system("sleep 1")
+        
+        # Start (OpenPLI style with --wait parameter)
+        print(f"[CiefpOscamEditor] Starting {oscam_variant}...")
+        os.system(f"ulimit -s 1024")
+        result = os.system(f"/usr/bin/{oscam_variant} --wait 60 {config_dir_param} --daemon --pidfile {pid_file} --restart 2 >/dev/null 2>&1")
+        
+        if result == 0:
+            print(f"[CiefpOscamEditor] OSCam uspešno restartovan OpenPLI metodom")
+            return True
+        else:
+            print(f"[CiefpOscamEditor] OpenPLI metod failed, trying fallback...")
+            return generic_restart(oscam_variant, config_dir)
+            
+    except Exception as e:
+        print(f"[CiefpOscamEditor] OpenPLI restart error: {str(e)}")
+        return False
+
+
+def pure2_restart(oscam_variant, variant_suffix):
+    """Pure2 specific restart"""
+    try:
+        # Koristi Pure2 cam skriptu ako postoji
+        cam_scripts = [
+            f"/usr/script/cam/oscam{variant_suffix}.sh",
+            "/usr/script/cam/oscamemu.sh",
+            "/usr/script/cam/softcam.sh"
+        ]
+
+        for script in cam_scripts:
+            if os.path.exists(script):
+                print(f"[CiefpOscamEditor] Running Pure2 script: {script}")
+
+                # Proveri da li je to oscamemu.sh i koristi pravilne parametre
+                if "oscamemu" in script:
+                    # Za oscamemu.sh koristimo "cam_res" parametar za restart
+                    result = os.system(f"{script} cam_res >/dev/null 2>&1")
+                else:
+                    # Za druge skripte probaj standardni restart
+                    result = os.system(f"{script} restart >/dev/null 2>&1")
+                    if result != 0:
+                        result = os.system(f"{script} >/dev/null 2>&1")
+
+                if result == 0:
+                    print(f"[CiefpOscamEditor] OSCam restartovan Pure2 cam skriptom: {script}")
+                    return True
+                else:
+                    print(f"[CiefpOscamEditor] Script {script} returned error: {result}")
+
+        # Fallback za Pure2 - koristi direktno cam_down i cam_up
+        print("[CiefpOscamEditor] Using Pure2 fallback method...")
+
+        # Prvo ugasi OSCam
+        os.system(f"killall -9 {oscam_variant} 2>/dev/null")
+        os.system("sleep 2")
+        os.system("rm -rf /tmp/.oscam /tmp/oscam* 2>/dev/null")
+
+        # Očisti PID-ove i temp fajlove
+        os.system("rm -f /var/run/oscam* /tmp/.oscam* 2>/dev/null")
+        os.system("sleep 1")
+
+        # Pokreni OSCam ponovo
+        config_dir = "/etc/tuxbox/config"
+
+        # Proveri da li config direktorijum postoji
+        if not os.path.exists(config_dir):
+            config_dir = "/etc/tuxbox/config"
+            if not os.path.exists(config_dir):
+                config_dir = "/etc/oscam"
+
+        # Pokreni OSCam u pozadini
+        result = os.system(f"/usr/bin/cam/{oscam_variant} -S -c {config_dir} >/dev/null 2>&1 &")
+
+        # Dodatna provera da li je proces pokrenut
+        os.system("sleep 3")
+        pid_check = os.system(f"pidof {oscam_variant} >/dev/null 2>&1")
+
+        if result == 0 or pid_check == 0:
+            print(f"[CiefpOscamEditor] OSCam restartovan Pure2 fallback metodom")
+            return True
+        else:
+            print("[CiefpOscamEditor] Pure2 fallback failed, trying generic restart")
+            return generic_restart(oscam_variant, config_dir)
+
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Pure2 restart error: {str(e)}")
+        # Fallback na generic restart
+        return generic_restart(oscam_variant, "/etc/tuxbox/config")
+
+def generic_restart(oscam_variant, config_dir):
+    """Generic restart method for other images"""
+    try:
+        pid_file = f"/var/tmp/{oscam_variant}.pid"
+        
+        # Stop
+        print(f"[CiefpOscamEditor] Stopping {oscam_variant}...")
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, 'r') as f:
+                    pid = f.read().strip()
+                    os.system(f"kill {pid} 2>/dev/null")
+                    print(f"[CiefpOscamEditor] Killed process {pid}")
+            except:
+                pass
+        
+        os.system(f"killall {oscam_variant} 2>/dev/null")
+        os.system("sleep 1")
+        
+        # Start
+        config_dir_param = f"--config-dir {config_dir}" if config_dir != "Unknown" else ""
+        
+        # Proveri sve moguće lokacije binary fajlova
+        binary_paths = [
+            f"/usr/softcams/{oscam_variant}",      # OpenViX
+            f"/usr/bin/{oscam_variant}",           # OpenPLI/OpenATV
+            f"/usr/bin/cam/{oscam_variant}",       # Pure2
+            "/usr/bin/oscam",                      # Generic
+            "/usr/local/bin/oscam"                 # Alternative
+        ]
+        
+        for binary in binary_paths:
+            if os.path.exists(binary):
+                print(f"[CiefpOscamEditor] Starting {oscam_variant} from {binary}...")
+                os.system(f"ulimit -s 1024")
+                
+                if config_dir_param:
+                    result = os.system(f"{binary} {config_dir_param} --daemon --pidfile {pid_file} --restart 2 >/dev/null 2>&1 &")
+                else:
+                    result = os.system(f"{binary} --daemon --pidfile {pid_file} --restart 2 >/dev/null 2>&1 &")
+                
+                os.system("sleep 0.5")
+                
+                if os.path.exists(pid_file):
+                    print(f"[CiefpOscamEditor] OSCam restartovan generičkim metodom")
+                    return True
+                break
+        
+        # Finalni pokušaj - jednostavno pokretanje
+        os.system(f"/usr/bin/{oscam_variant} -b >/dev/null 2>&1 &")
+        print(f"[CiefpOscamEditor] OSCam startovan osnovnom komandom")
+        return True
+        
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Generic restart error: {str(e)}")
+        return False
+
+def emergency_restart():
+    """Emergency fallback restart"""
+    try:
+        print("[CiefpOscamEditor] Running emergency restart...")
+        os.system("killall -9 oscam* oscam-emu* oscam-master* oscam-smod* oscamicamnew* 2>/dev/null")
+        os.system("sleep 2")
+        os.system("rm -rf /tmp/.oscam /tmp/oscam* 2>/dev/null")
+        result = os.system("/usr/bin/oscam -b >/dev/null 2>&1 &")
+        
+        if result == 0:
+            print("[CiefpOscamEditor] OSCam restartovan emergency metodom")
+            return True
+        else:
+            print("[CiefpOscamEditor] Emergency metod failed!")
+            return False
+    except Exception as e:
+        print(f"[CiefpOscamEditor] Emergency restart error: {str(e)}")
+        return False
+
 # Postojeći kod za prevode
 TRANSLATIONS = {
     "en": en_trans,
@@ -75,6 +456,7 @@ config.plugins.CiefpOscamEditor.dvbapi_path = ConfigSelection(
     default="/etc/tuxbox/config/oscam.dvbapi",
     choices=[
         ("/etc/tuxbox/config/oscam.dvbapi", "Default"),
+        ("/etc/tuxbox/config/oscam/oscam.dvbapi", "Oscam"),
         ("/etc/tuxbox/config/oscam-emu/oscam.dvbapi", "Oscam-emu"),
         ("/etc/tuxbox/config/oscam-master/oscam.dvbapi", "Oscam-master"),
         ("/etc/tuxbox/config/oscam-smod/oscam.dvbapi", "Oscam-smod"),
@@ -121,7 +503,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.3"
+PLUGIN_VERSION = "1.2.4"
 
 def check_for_update(session):
     try:
@@ -839,6 +1221,7 @@ class CiefpOscamConfEditor(Screen, ConfigListScreen):
     def moveDown(self):
         self["config"].instance.moveSelection(self["config"].instance.moveDown)
 
+
 class CiefpOscamEditorMain(Screen):
     skin = """
     <screen name="CiefpOscamEditorMain" position="center,center" size="1400,800" title="..:: Ciefp Oscam Editor ::..">
@@ -856,22 +1239,20 @@ class CiefpOscamEditorMain(Screen):
         oscam_info = get_oscam_info()
         self.setTitle(f"{get_translation('title_main')} (OSCam: {oscam_info['version']})")
         self["channel_info"] = Label()
-        
-        
-        # Odložena provera verzije da bi se ekran prvo inicijalizovao
+
+        # Odložena provera verzije
         self.updateTimer = eTimer()
         self.updateTimer.callback.append(lambda: check_for_update(self.session))
         self.updateTimer.start(500, True)
 
-
-        # nove labele
+        # Labele
         self["key_red"] = Label(get_translation("exit"))
         self["key_green"] = Label(get_translation("functions"))
         self["key_yellow"] = Label(get_translation("settings"))
         self["key_blue"] = Label(get_translation("free_cccam"))
         self["background"] = Pixmap()
 
-        # action map
+        # Action map
         self["actions"] = ActionMap(["ColorActions"], {
             "red": self.close,
             "green": self.openChoiceBox,
@@ -886,32 +1267,69 @@ class CiefpOscamEditorMain(Screen):
         self.current_provider_id = "000000"
         self.updateChannelInfo()
 
+    def getSID(self):
+        """Dobija SID iz trenutnog servisa"""
+        service = self.session.nav.getCurrentlyPlayingServiceReference()
+        if service:
+            try:
+                service_string = service.toString()
+                parts = service_string.split(':')
+                if len(parts) >= 4:
+                    sid_hex = parts[3]
+                    sid_decimal = int(sid_hex, 16)
+                    return f"{sid_decimal:04X}"
+            except:
+                pass
+        return "0001"
+
+    def getVPID(self):
+        """Dobija Video PID iz trenutnog servisa"""
+        try:
+            service = self.session.nav.getCurrentService()
+            if service:
+                info = service.info()
+                if info:
+                    vpid = info.getInfo(iServiceInformation.sVideoPID)
+                    if vpid > 0:
+                        return f"{vpid:04X}"
+        except:
+            pass
+        return "0021"
+
+    def getChannelName(self):
+        """Dobija ime trenutnog kanala"""
+        try:
+            service = self.session.nav.getCurrentService()
+            if service:
+                info = service.info()
+                if info:
+                    name = info.getName()
+                    if name:
+                        return name
+        except:
+            pass
+        return "Current Channel"
+
     def openChoiceBox(self):
         choices = [
-            # oscam.info
             (get_translation("oscam_info_button"), "info"),
             (get_translation("oscam_status"), "status"),
             (get_translation("ecm_info"), "ecm_info"),
 
-            # oscam.server
             (get_translation("oscam_server"), "server_preview"),
             (get_translation("add_reader"), "server_add"),
             (get_translation("add_emulator"), "server_emulator"),
             (get_translation("select_reader"), "server_reader_select"),
 
-            # softcamkey
             (get_translation("softcam_key_preview"), "softcam_key_preview"),
             (get_translation("add_biss_key"), "add_biss_key"),
 
-            # dvbapi
             (get_translation("add_dvbapi"), "dvbapi_add"),
             (get_translation("preview_dvbapi"), "dvbapi_preview"),
 
-            # oscam.conf
             (get_translation("oscam_conf_editor"), "conf_editor"),
             (get_translation("oscam_conf_preview"), "conf_preview"),
 
-            # oscam.user
             (get_translation("oscam_user_preview"), "user_preview"),
             (get_translation("oscam_user"), "user_editor"),
         ]
@@ -924,15 +1342,13 @@ class CiefpOscamEditorMain(Screen):
             return
         selection = choice[1]
 
-        # oscam.info
-        if selection  == "info":
+        if selection == "info":
             self.session.open(CiefpOscamInfo)
         elif selection == "status":
             self.session.open(CiefpOscamStatus)
         elif selection == "ecm_info":
             self.session.open(CiefpOscamEcmInfo)
 
-        # oscam.server
         elif selection == "server_preview":
             self.session.open(CiefpOscamServerPreview)
         elif selection == "server_add":
@@ -954,20 +1370,16 @@ class CiefpOscamEditorMain(Screen):
                 self.session.open(MessageBox, get_translation("file_read_error").format(str(e)), MessageBox.TYPE_ERROR,
                                   timeout=5)
 
-        # softcamkey
         elif selection == "softcam_key_preview":
             self.session.open(CiefpOscamSoftCamKeyPreview)
         elif selection == "add_biss_key":
-            self.addBissKey() 
+            self.addBissKey()
 
-
-        # dvbapi
         elif selection == "dvbapi_add":
             self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
         elif selection == "dvbapi_preview":
             self.session.open(CiefpOscamEditorPreview)
 
-        # oscam.conf
         elif selection == "conf_editor":
             self.session.open(CiefpOscamConfEditor)
         elif selection == "conf_preview":
@@ -975,14 +1387,13 @@ class CiefpOscamEditorMain(Screen):
             conf_path = dvbapi_path.replace("oscam.dvbapi", "oscam.conf")
             self.session.open(CiefpOscamConfPreview, conf_path)
 
-        # oscam.user
         elif selection == "user_preview":
             dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
             user_path = dvbapi_path.replace("oscam.dvbapi", "oscam.user")
             self.session.open(CiefpOscamUserPreview, user_path)
         elif selection == "user_editor":
             self.session.open(CiefpOscamUserEditor)
-    
+
     def addFreeReader(self):
         def onSourceSelected(selected):
             if not selected or not selected[1]:
@@ -1026,7 +1437,8 @@ class CiefpOscamEditorMain(Screen):
                 with open(server_path, "a", encoding="utf-8") as f:
                     f.write("\n" + "\n".join(reader_lines) + "\n")
 
-                os.system("killall -HUP oscam")
+                restart_oscam()
+
                 self.session.open(
                     MessageBox,
                     f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
@@ -1052,32 +1464,6 @@ class CiefpOscamEditorMain(Screen):
             title=get_translation("select_source"),
             list=choices
         )
-
-    def updateLines(self, updated_lines):
-        if updated_lines:
-            self.lines = updated_lines
-            self["file_list"].setList(self.lines)
-
-    def moveUp(self):
-        self["file_list"].up()
-
-    def moveDown(self):
-        self["file_list"].down()
-                
-
-    def openSettings(self):
-        self.session.open(CiefpOscamEditorSettings)
-       
-
-        # Automatsko podešavanje putanje
-        if config.plugins.CiefpOscamEditor.auto_version_path.value == "yes" and oscam_info["config_dir"] != "Unknown":
-            config_dir = oscam_info["config_dir"]
-            if config_dir.endswith("/"):
-                config_dir = config_dir[:-1]
-            new_dvbapi_path = f"{config_dir}/oscam.dvbapi"
-            if new_dvbapi_path not in [x[0] for x in config.plugins.CiefpOscamEditor.dvbapi_path.choices.choices]:
-                config.plugins.CiefpOscamEditor.dvbapi_path.choices.choices.append((new_dvbapi_path, f"Custom ({config_dir})"))
-            config.plugins.CiefpOscamEditor.dvbapi_path.setValue(new_dvbapi_path)
 
     def get_ecm_info(self):
         ecm_path = "/tmp/ecm.info"
@@ -1167,102 +1553,98 @@ class CiefpOscamEditorMain(Screen):
             self["channel_info"].setText(text)
         else:
             self["channel_info"].setText(get_translation("no_channel_info"))
-    
-    # DODAJ OVU METODU U CIEFPOSCAMEDITORMAIN KLASU
+
     def addBissKey(self):
-        """Dodaje BISS ključ za trenutni kanal"""
+        """Dodaje BISS ključ za trenutni kanal sa automatskim SID i VPID"""
         # Dohvati informacije o trenutnom kanalu
         service = self.session.nav.getCurrentService()
         if not service:
             self.session.open(MessageBox, get_translation("no_channel_selected"), MessageBox.TYPE_ERROR, timeout=3)
             return
-        
-        info = service.info()
-        service_sid = info.getInfo(iServiceInformation.sSID) or -1
-        channel_name = info.getName() or "Unknown"
-        
-        # Formatiraj SID
-        sid = "%04X" % service_sid if service_sid != -1 else "0001"
-        
+
+        # Dobij SID, VPID i ime kanala
+        sid = self.getSID()
+        vpid = self.getVPID()
+        channel_name = self.getChannelName()
+
+        # Prikaži informacije korisniku
+        info_text = f"{channel_name} (SID:{sid}/VPID:{vpid}) Enter BISS Key:"
+
         # Pokreni VirtualKeyBoard za unos BISS ključa
         self.session.openWithCallback(
-            lambda key: self.bissKeyCallback(key, sid, channel_name),
-            VirtualKeyBoard, 
-            title=get_translation("enter_biss_key"),
+            lambda key: self.bissKeyCallback(key, sid, vpid, channel_name),
+            VirtualKeyBoard,
+            title=info_text,
             text=""
         )
-    
-    def bissKeyCallback(self, biss_key, sid, channel_name):
+
+    def bissKeyCallback(self, biss_key, sid, vpid, channel_name):
         """Callback nakon unosa BISS ključa"""
         if not biss_key:
             return
-        
-        # Formatiraj ključ (ukloni razmake, velika slova)
+
         formatted_key = biss_key.replace(" ", "").upper()
-        
-        # Proveri dužinu ključa (BISS može biti 8 ili 16 hex karaktera)
+
         if len(formatted_key) not in [8, 16]:
-            self.session.open(MessageBox, get_translation("invalid_key_length"), MessageBox.TYPE_ERROR, timeout=3)
-            return
-        
-        # Vrijeme za komentar
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # ECM PID (default 1FFF)
-        ecmpid = "1FFF"
-        
-        # Spoji SID i ECM PID
-        sid_ecmpid = f"{sid}{ecmpid}"
-        
-        # Finalna linija za SoftCam.Key
-        line = f"F {sid_ecmpid} 00 {formatted_key} ; {channel_name} - {current_time}\n"
-        
-        try:
-            # Odredi putanju do SoftCam.Key
-            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
-            softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
-            
-            # Kreiraj direktorijum ako ne postoji
-            os.makedirs(os.path.dirname(softcam_path), exist_ok=True)
-            
-            # Dodaj ključ u fajl
-            with open(softcam_path, "a", encoding="utf-8") as f:
-                f.write(line)
-            
-            # Reload OSCam-a
-            os.system("killall -HUP oscam")
-            
             self.session.open(
-                MessageBox, 
-                get_translation("biss_key_added").format(channel_name), 
-                MessageBox.TYPE_INFO, 
+                MessageBox,
+                get_translation("invalid_key_length"),
+                MessageBox.TYPE_ERROR,
                 timeout=3
             )
-            
+            return
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # FORMAT KOJI VAŠ OSCAM ZAHTEVA: SID + VPID
+        sid_vpid = f"{sid}{vpid}"
+        line = f"F {sid_vpid} 00 {formatted_key} ; {channel_name} - {current_time}\n"
+
+        try:
+            dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+            base_dir = os.path.dirname(dvbapi_path)
+
+            # Upis u softcam.key fajlove
+            for filename in ["SoftCam.Key", "softcam.key"]:
+                softcam_path = os.path.join(base_dir, filename)
+                self._writeToFile(softcam_path, line, f"F {sid_vpid} 00")
+
+            restart_oscam()
+
+            self.session.open(
+                MessageBox,
+                get_translation("biss_key_added").format(channel_name),
+                MessageBox.TYPE_INFO,
+                timeout=3
+            )
+
         except Exception as e:
             self.session.open(
-                MessageBox, 
-                get_translation("biss_key_error").format(str(e)), 
-                MessageBox.TYPE_ERROR, 
+                MessageBox,
+                get_translation("biss_key_error").format(str(e)),
+                MessageBox.TYPE_ERROR,
                 timeout=3
-            )        
+            )
 
-    def openOscamConfEditor(self):
-        try:
-            self.session.open(CiefpOscamConfEditor)
-        except Exception as e:
-            from Screens.MessageBox import MessageBox
-            self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=10)
-            
-                 
-    def addReader(self):
-        self.session.open(CiefpOscamServerAdd)      
-    
-    def openAddDvbapi(self):
-        self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
+    def _writeToFile(self, file_path, new_line, search_pattern):
+        """Upis bez duplikata"""
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = [line for line in f if search_pattern not in line]
+        else:
+            lines = []
+
+        lines.append(new_line)
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
 
     def openSettings(self):
         self.session.open(CiefpOscamEditorSettings)
+
+    def openAddDvbapi(self):
+        self.session.open(CiefpOscamEditorAdd, default_provider=self.current_provider_id)
 
     def openServerPreview(self):
         self.session.open(CiefpOscamServerPreview)
@@ -1645,7 +2027,7 @@ class CiefpOscamServerPreview(Screen):
 
     def deleteReader(self):
         self.session.openWithCallback(self.updateLines, CiefpOscamServerReaderSelect, self.lines)
-    
+
     def addFreeReader(self):
         def onSourceSelected(selected):
             if not selected or not selected[1]:
@@ -1689,7 +2071,8 @@ class CiefpOscamServerPreview(Screen):
                 with open(server_path, "a", encoding="utf-8") as f:
                     f.write("\n" + "\n".join(reader_lines) + "\n")
 
-                os.system("killall -HUP oscam")
+                restart_oscam()
+
                 self.session.open(
                     MessageBox,
                     f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
@@ -1823,19 +2206,8 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
 
         # Emulator reader
         if self.enable.value == "1":
-            # Get the correct SoftCam.Key path based on oscam version
             oscam_info = get_oscam_info()
             config_dir = oscam_info.get("config_dir", "/etc/tuxbox/config")
-
-            # Determine the correct SoftCam.Key path
-            if "oscam-emu" in config_dir:
-                softcam_path = f"{config_dir}/SoftCam.Key"
-            elif "oscam-master" in config_dir:
-                softcam_path = f"{config_dir}/SoftCam.Key"
-            elif "oscam-smod" in config_dir:
-                softcam_path = f"{config_dir}/SoftCam.Key"
-            else:
-                softcam_path = f"{config_dir}/SoftCam.Key"
 
             online_url = "https://raw.githubusercontent.com/MOHAMED19OS/SoftCam_Emu/main/SoftCam.Key"
 
@@ -1847,11 +2219,26 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
                 f"device                        = emulator"
             ])
 
-            # Add device line for key source
+            # Ako je online izvor → dodaj URL u device
             if self.key_source.value == "online":
-                reader_lines.append(f"device                        = {online_url}  # online softcamkey")
+                reader_lines.append(
+                    f"device                        = {online_url}  # online softcamkey"
+                )
             else:
-                reader_lines.append(f"device                        = {softcam_path}  # lokalni softcamkey")
+                # Ako je lokalni izvor → pobrini se da postoje oba fajla (SoftCam.Key i softcam.key)
+                dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
+                base_dir = os.path.dirname(dvbapi_path)
+                path1 = os.path.join(base_dir, "SoftCam.Key")
+                path2 = os.path.join(base_dir, "softcam.key")
+
+                for path in [path1, path2]:
+                    if not os.path.exists(path):
+                        try:
+                            os.makedirs(os.path.dirname(path), exist_ok=True)
+                            with open(path, "w", encoding="utf-8") as f:
+                                f.write("## Created by CiefpOscamEditor ##\n")
+                        except Exception as e:
+                            print(f"[CiefpOscamEditor] Greška pri kreiranju {path}: {e}")
 
             reader_lines.extend([
                 f"caid                          = {self.caid.value}",
@@ -1875,7 +2262,7 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
                 ""  # Prazan red na kraju reader-a
             ])
 
-        # Snimanje u fajl
+        # Snimanje u oscam.server
         if reader_lines:
             server_path = config.plugins.CiefpOscamEditor.dvbapi_path.value.replace("oscam.dvbapi", "oscam.server")
             try:
@@ -1884,14 +2271,11 @@ class CiefpOscamEmulatorAdd(ConfigListScreen, Screen):
                 # Proveri da li fajl već postoji i da li ima sadržaja
                 file_exists = os.path.exists(server_path) and os.path.getsize(server_path) > 0
 
-                with open(server_path, "a") as f:
-                    # Ako fajl već postoji i ima sadržaj, dodaj prazan red pre novog reader-a
+                with open(server_path, "a", encoding="utf-8") as f:
                     if file_exists and reader_lines:
                         f.write("\n")
-
                     f.write("\n".join(reader_lines))
 
-                # DODAJ TIMEOUT OD 5 SEKUNDI
                 self.session.open(MessageBox, "Čitač uspešno dodat!", MessageBox.TYPE_INFO, timeout=5)
                 self.close()
             except Exception as e:
@@ -2816,10 +3200,14 @@ class CiefpOscamUserEditor(Screen, ConfigListScreen):
             os.makedirs(os.path.dirname(user_path), exist_ok=True)
             with open(user_path, "a", encoding="utf-8") as f:
                 f.write("\n".join(lines))
-            os.system("killall -HUP oscam")  # Reload OSCam-a
-            self.session.open(MessageBox, get_translation("user_saved").format(user_path), MessageBox.TYPE_INFO, timeout=5)
+
+            restart_oscam()
+
+            self.session.open(MessageBox, get_translation("user_saved").format(user_path), MessageBox.TYPE_INFO,
+                              timeout=5)
         except Exception as e:
-            self.session.open(MessageBox, get_translation("write_error").format(user_path, str(e)), MessageBox.TYPE_ERROR)
+            self.session.open(MessageBox, get_translation("write_error").format(user_path, str(e)),
+                              MessageBox.TYPE_ERROR)
 
     def previewFile(self):
         dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
@@ -2863,7 +3251,8 @@ class CiefpOscamUserPreview(Screen):
                 self["file_list"].setList([get_translation("file_not_exist")])
         except Exception as e:
             self["file_list"].setList([get_translation("file_read_error").format(str(e))])
-            
+
+
 class CiefpOscamSoftCamKeyPreview(Screen):
     skin = """
     <screen name="CiefpOscamSoftCamKeyPreview" position="center,center" size="1400,800" title="..:: SoftCam.key Preview ::..">
@@ -2898,6 +3287,56 @@ class CiefpOscamSoftCamKeyPreview(Screen):
         self.lines = []
         self.loadFile()
 
+        # Dobij informacije o trenutnom kanalu
+        self.current_service = self.session.nav.getCurrentlyPlayingServiceReference()
+        self.sid = self.getSID()
+        self.vpid = self.getVPID()
+        self.channel_name = self.getChannelName()
+
+    def getSID(self):
+        """Dobija SID iz trenutnog servisa"""
+        if self.current_service:
+            try:
+                # Service reference format: 1:0:1:1234:567:2:0:0:0:0:
+                service_string = self.current_service.toString()
+                parts = service_string.split(':')
+                if len(parts) >= 4:
+                    sid_hex = parts[3]  # SID je četvrti deo
+                    # Konvertuj hex u decimalni i onda u 4-cifreni hex
+                    sid_decimal = int(sid_hex, 16)
+                    return f"{sid_decimal:04X}"  # 4-cifreni hex
+            except:
+                pass
+        return "0001"  # Default
+
+    def getVPID(self):
+        """Dobija Video PID iz trenutnog servisa"""
+        try:
+            service = self.session.nav.getCurrentService()
+            if service:
+                info = service.info()
+                if info:
+                    vpid = info.getInfo(iServiceInformation.sVideoPID)
+                    if vpid > 0:
+                        return f"{vpid:04X}"  # 4-cifreni hex
+        except:
+            pass
+        return "0021"  # Default
+
+    def getChannelName(self):
+        """Dobija ime trenutnog kanala"""
+        try:
+            service = self.session.nav.getCurrentService()
+            if service:
+                info = service.info()
+                if info:
+                    name = info.getName()
+                    if name:
+                        return name
+        except:
+            pass
+        return "Current Channel"
+
     def loadFile(self):
         dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
         softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
@@ -2914,76 +3353,87 @@ class CiefpOscamSoftCamKeyPreview(Screen):
             self["file_list"].setList([get_translation("file_read_error").format(str(e))])
 
     def addBissKey(self):
-        # Pokreće VirtualKeyBoard za unos BISS ključa
-        self.session.openWithCallback(self.bissKeyCallback, VirtualKeyBoard, title=get_translation("enter_new_key"),
-                                      text="0")
+        """Pokreće dijalog za unos BISS ključa sa automatskim parametrima"""
+        title = f"Enter BISS Key for {self.channel_name} (SID:{self.sid}, VPID:{self.vpid})"
+        self.session.openWithCallback(
+            self.bissKeyCallback,
+            VirtualKeyBoard,
+            title=title,
+            text=""
+        )
 
-    def bissKeyCallback(self, new_key):
-        if not new_key:
+    def bissKeyCallback(self, biss_key):
+        """Callback za unos BISS ključa"""
+        if not biss_key:
             return
 
-        # Formatiraj ključ (ukloni razmake, velika slova)
-        formatted_key = new_key.replace(" ", "").upper()
+        formatted_key = biss_key.replace(" ", "").upper()
 
-        # Vrijeme za komentar
+        if len(formatted_key) not in [8, 16]:
+            self.session.open(
+                MessageBox,
+                get_translation("invalid_key_length"),
+                MessageBox.TYPE_ERROR,
+                timeout=3
+            )
+            return
+
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Dohvati aktivni servis
-        service = self.session.nav.getCurrentService()
-        info = service and service.info()
-        service_sid = info and info.getInfo(iServiceInformation.sSID) or -1
-        channel_info = info and info.getName() or "Unknown"
-
-        # Ako nema SID-a, koristi 0001
-        sid = "%04X" % service_sid if service_sid != -1 else "0001"
-
-        # Pokušaj da pročitaš ECM PID iz ecm.info
-        ecmpid = "1FFF"  # default
-        try:
-            ecm_path = "/tmp/ecm.info"
-            if os.path.exists(ecm_path):
-                with open(ecm_path, "r") as f:
-                    for line in f:
-                        if line.lower().startswith("pid:"):
-                            val = line.split(":", 1)[1].strip()
-                            if val:
-                                ecmpid = val.upper().replace("0X", "")
-                                ecmpid = ecmpid.zfill(4)
-                            break
-        except Exception as e:
-            print(f"[BISS] Error reading ecm.info:{e}")
-
-        # Spoji SID i ECM PID u formatu SIDECMPID
-        sid_ecmpid = f"{sid}{ecmpid}"
-
-        # Finalna linija za SoftCam.Key
-        line = f"F {sid_ecmpid} 00 {formatted_key} ; Added on {current_time} for {channel_info}\n"
+        # FORMAT KOJI VAŠ OSCAM ZAHTEVA: SID + VPID
+        sid_vpid = f"{self.sid}{self.vpid}"
+        line = f"F {sid_vpid} 00 {formatted_key} ; {self.channel_name} - {current_time}\n"
 
         try:
             dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
-            softcam_path = dvbapi_path.replace("oscam.dvbapi", "SoftCam.Key")
-            os.makedirs(os.path.dirname(softcam_path), exist_ok=True)
+            base_dir = os.path.dirname(dvbapi_path)
 
-            with open(softcam_path, "a", encoding="utf-8") as f:
-                f.write(line)
+            # Upis u softcam.key fajlove
+            for filename in ["SoftCam.Key", "softcam.key"]:
+                softcam_path = os.path.join(base_dir, filename)
+                self._writeToFile(softcam_path, line, f"F {sid_vpid} 00")
 
-            # Reload OSCam da bi se ključ odmah učitao
-            os.system("killall -HUP oscam")
+            # Dodaj u prikaz
+            self.lines.append(line.strip())
+            self["file_list"].setList(self.lines)
 
-            # Osveži prikaz
-            self.loadFile()
-            
-            self.session.open(MessageBox, f"BISS key added for {channel_info}", MessageBox.TYPE_INFO, timeout=3)
+            restart_oscam()
+
+            self.session.open(
+                MessageBox,
+                get_translation("biss_key_added").format(self.channel_name),
+                MessageBox.TYPE_INFO,
+                timeout=3
+            )
 
         except Exception as e:
-            self.session.open(MessageBox, f"Error while recording BISS key:{str(e)}", MessageBox.TYPE_ERROR, timeout=3)
+            print(f"Greška pri upisu BISS ključa: {e}")
+            self.session.open(
+                MessageBox,
+                f"Error: {str(e)}",
+                MessageBox.TYPE_ERROR,
+                timeout=3
+            )
+
+    def _writeToFile(self, file_path, new_line, search_pattern):
+        """Upis bez duplikata"""
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = [line for line in f if search_pattern not in line]
+        else:
+            lines = []
+
+        lines.append(new_line)
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
 
     def deleteKey(self):
         current = self["file_list"].getCurrent()
-        if current and current != get_translation("file_not_exist") and not current.startswith(get_translation("file_read_error")):
-            # KORIGOVANO: getSelectedIndex() umjesto getIndex()
+        if current and current != get_translation("file_not_exist") and not current.startswith(
+                get_translation("file_read_error")):
             index = self["file_list"].getSelectedIndex()
-            # Koristimo session.open za MessageBox
             self.session.openWithCallback(
                 lambda result: self.confirmDelete(index) if result else None,
                 MessageBox,
@@ -2997,20 +3447,31 @@ class CiefpOscamSoftCamKeyPreview(Screen):
         try:
             del self.lines[index]
             self["file_list"].setList(self.lines)
-            # Koristimo session.open za MessageBox
+
+            # Ažuriraj fajl
+            with open(self.softcam_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(self.lines) + "\n")
+
+            restart_oscam()
+
             self.session.open(MessageBox, get_translation("key_deleted"), MessageBox.TYPE_INFO, timeout=3)
         except Exception as e:
-            self.session.open(MessageBox, get_translation("delete_error").format(str(e)), MessageBox.TYPE_ERROR, timeout=3)
+            self.session.open(MessageBox, get_translation("delete_error").format(str(e)), MessageBox.TYPE_ERROR,
+                              timeout=3)
 
     def saveFile(self):
         try:
             with open(self.softcam_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(self.lines) + "\n")
-            os.system("killall -HUP oscam")  # Reload OSCam-a
-            self.session.open(MessageBox, get_translation("file_saved").format(self.softcam_path), MessageBox.TYPE_INFO, timeout=3)
+
+            restart_oscam()
+
+            self.session.open(MessageBox, get_translation("file_saved").format(self.softcam_path), MessageBox.TYPE_INFO,
+                              timeout=3)
             self.close()
         except Exception as e:
-            self.session.open(MessageBox, get_translation("write_error").format(self.softcam_path, str(e)), MessageBox.TYPE_ERROR, timeout=3)
+            self.session.open(MessageBox, get_translation("write_error").format(self.softcam_path, str(e)),
+                              MessageBox.TYPE_ERROR, timeout=3)
 
     def moveUp(self):
         self["file_list"].up()
