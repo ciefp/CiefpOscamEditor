@@ -127,6 +127,65 @@ def restart_oscam():
         # Hitni fallback
         return emergency_restart()
 
+def openatv_restart(oscam_variant, variant_suffix, config_dir):
+    """OpenATV specific restart"""
+    try:
+        print(f"[CiefpOscamEditor] OpenATV restart for: {oscam_variant}")
+
+        # OpenATV koristi iste init skripte kao OpenViX
+        cam_name = "oscam-emu" if "emu" in oscam_variant.lower() else oscam_variant
+        init_script = f"/etc/init.d/softcam.{cam_name}"
+
+        if os.path.exists(init_script):
+            print(f"[CiefpOscamEditor] Found OpenATV init script: {init_script}")
+
+            # Koristi restart komandu
+            result = os.system(f"{init_script} restart >/dev/null 2>&1")
+            os.system("sleep 3")
+
+            # Proveri status
+            status_result = os.system(f"{init_script} status >/dev/null 2>&1")
+
+            if status_result == 0:
+                print(f"[CiefpOscamEditor] OSCam restartovan OpenATV init skriptom")
+                return True
+
+        # Fallback za OpenATV
+        print(f"[CiefpOscamEditor] Using OpenATV fallback...")
+
+        # OpenATV koristi /usr/bin/ za binarne fajlove
+        binary_path = f"/usr/bin/{oscam_variant}"
+        if not os.path.exists(binary_path):
+            print(f"[CiefpOscamEditor] Binary not found at {binary_path}")
+            return generic_restart(oscam_variant, config_dir)
+
+        # Standardni OpenATV restart procedure
+        pid_file = f"/var/tmp/{oscam_variant}.pid"
+
+        # Stop
+        os.system(f"{init_script} stop >/dev/null 2>&1" if os.path.exists(
+            init_script) else f"killall {oscam_variant} 2>/dev/null")
+        os.system("sleep 2")
+
+        # Start
+        config_dir_param = f"--config-dir /etc/tuxbox/config/{cam_name}" if cam_name != "oscam" else "--config-dir /etc/tuxbox/config"
+        cmd = f"ulimit -s 1024 && {binary_path} {config_dir_param} --daemon --pidfile {pid_file} --restart 2 >/dev/null 2>&1"
+        result = os.system(cmd)
+
+        os.system("sleep 3")
+
+        # Proveri da li radi
+        pid_check = os.system(f"pidof {oscam_variant} >/dev/null 2>&1")
+
+        if pid_check == 0:
+            print(f"[CiefpOscamEditor] OSCam uspešno restartovan na OpenATV")
+            return True
+        else:
+            return generic_restart(oscam_variant, config_dir)
+
+    except Exception as e:
+        print(f"[CiefpOscamEditor] OpenATV restart error: {str(e)}")
+        return generic_restart(oscam_variant, config_dir)
 
 def openvix_restart(oscam_variant, variant_suffix, config_dir):
     """OpenViX specific restart sa poboljšanom detekcijom"""
@@ -503,7 +562,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.4"
+PLUGIN_VERSION = "1.2.5"
 
 def check_for_update(session):
     try:
@@ -601,6 +660,62 @@ oscam_regex = {
     'httppwd': re.compile(r'httppwd\s*=\s*(?P<httppwd>.*)'),
 }
 
+def get_all_readers_from_config():
+    """
+    Vrati listu svih reader labela iz oscam.server.
+    Lokacija se otkriva iz oscam.conf ili poznatih putanja.
+    """
+    readers = []
+
+    # 1) pronađi oscam.conf
+    conf_paths = [
+        "/etc/tuxbox/config/oscam.conf",
+        "/etc/tuxbox/config/oscam-emu/oscam.conf",
+        "/usr/keys/oscam.conf",
+        "/var/tuxbox/config/oscam.conf",
+    ]
+    conf_file = next((p for p in conf_paths if os.path.exists(p)), None)
+
+    server_file = None
+    if conf_file:
+        with open(conf_file, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                m = re.match(r'^\s*serverfile\s*=\s*(.+)$', line, flags=re.IGNORECASE)
+                if m:
+                    server_file = m.group(1).strip()
+                    break
+
+    # 2) ako nije definisan u conf-u, probaj poznate lokacije
+    if not server_file:
+        possible_paths = [
+            "/etc/tuxbox/config/oscam.server",
+            "/etc/tuxbox/config/oscam/oscam.server",
+            "/etc/tuxbox/config/oscam-emu/oscam.server",
+            "/etc/tuxbox/config/oscam-master/oscam.server",
+            "/etc/tuxbox/config/oscam-smod/oscam.server",
+            "/etc/tuxbox/config/oscamicamnew/oscam.server",
+        ]
+        server_file = next((p for p in possible_paths if os.path.exists(p)), None)
+
+    if not server_file or not os.path.exists(server_file):
+        print("[OscamStatus] oscam.server not found in any known location")
+        return readers
+
+    print(f"[OscamStatus] using oscam.server from {server_file}")
+
+    # 3) parsiraj label-e iz oscam.server
+    with open(server_file, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            m = re.match(r'^\s*label\s*=\s*(.+)$', line, flags=re.IGNORECASE)
+            if m:
+                label = m.group(1).strip()
+                if label:
+                    readers.append(label)
+
+    print(f"[OscamStatus] found readers: {readers}")
+    return readers
+
+
 def read_oscam_conf():
     conf = {
         "ip": config.plugins.CiefpOscamEditor.webif_ip.value,
@@ -647,11 +762,12 @@ def read_oscam_conf():
     print(f"[CiefpOscamEditor] oscam.conf nije pronađen, koristim podrazumevane vrednosti")
     return conf
 
+
 def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
     """
     Dohvata OSCam čitače preko WebIf-a koristeći XML sa ?part=status.
-    Radi sa tvojom verzijom OSCam-a 2.25.05.
-    Prikazuje sve čitače (type='r', 'p') i koristi ispravne metode za status, au, idle.
+    Radi sa verzijom OSCam 2.25.05.
+    Vraća listu reader-a sa normalizovanim imenima (bez sufiksa (r)/(p)).
     """
     status_data = []
     url = f"http://{ip}:{port}/oscamapi.html?part=status"
@@ -672,30 +788,20 @@ def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
                 root = ET.fromstring(xml_data)
                 # Traži sve <client> koji su čitači ili proxy (type='r' ili 'p')
                 for client in root.findall(".//client[@type='r']") + root.findall(".//client[@type='p']"):
-                    name = client.get("name", "Unknown")
-                    protocol = client.get("protocol", "Unknown")
-                    # Ukloni verziju iz protokola ako postoji
-                    if " (" in protocol:
-                        protocol = protocol.split(" (")[0]
-
+                    name = client.get("name", "Unknown").strip()
+                    protocol = client.get("protocol", "Unknown").strip()
                     # Status je sadržaj <connection> taga
                     connection = client.find("connection")
                     status = connection.text.strip() if connection is not None and connection.text else "Unknown"
-
-                    # AU je atribut
-                    au = client.get("au", "0")
-
-                    # Idle vreme je u <times idle="...">, ali u tvojoj verziji ga nema
-                    # Koristi idle iz atributa <times> ako postoji, inače "0"
+                    au = client.get("au", "0").strip()
                     times = client.find("times")
                     idle = times.get("idle", "0") if times is not None else "0"
 
-                    # Dodaj tip za jasnoću (opciono)
-                    client_type = client.get("type", "Unknown")
-                    display_name = f"{name} ({client_type})"
+                    # Normalizacija imena: ukloni sufiks (r) ili (p)
+                    clean_name = name.split(" (")[0].strip()
 
                     status_data.append({
-                        "name": display_name,
+                        "name": clean_name,
                         "status": status,
                         "au": au,
                         "idle": idle,
@@ -719,6 +825,7 @@ def get_oscam_readers(ip="127.0.0.1", port="8888", user="", pwd=""):
     print("[CiefpOscamEditor] Nema dostupnih čitača")
     return []
 
+
 class CiefpOscamStatus(Screen):
     skin = """<screen name="CiefpOscamStatus" position="center,center" size="1500,800" title="..:: OSCam Status ::..">
         <widget name="status_list" position="10,10" size="1080,740" scrollbarMode="showOnDemand" />
@@ -734,7 +841,6 @@ class CiefpOscamStatus(Screen):
         self.session = session
         self.is_refreshing = True
 
-        # Umesto eListbox koristi MenuList sa MultiContent podrškom
         self["status_list"] = MenuList([], enableWrapAround=True, content=eListboxPythonMultiContent)
         self["status_list"].l.setItemHeight(30)
         self["status_list"].l.setFont(0, gFont("Regular", 24))
@@ -760,19 +866,43 @@ class CiefpOscamStatus(Screen):
         self.refreshStatus()
 
     def refreshStatus(self):
+        """
+        Osvežava listu reader-a na ekranu sa statusom ON/OFF i informacijama.
+        """
         status_data = []
         try:
             conf = read_oscam_conf()
-            readers = get_oscam_readers(
+            active_readers = get_oscam_readers(
                 ip=conf["ip"],
                 port=conf["port"],
                 user=conf["user"],
                 pwd=conf["pwd"]
             )
 
-            if readers:
-                for reader in readers:
-                    status_lower = reader['status'].lower()
+            # map active readers po normalizovanom imenu
+            active_map = {r['name']: r for r in active_readers}
+
+            all_readers = get_all_readers_from_config()
+            if not all_readers:
+                status_data.append([
+                    ("", ""),
+                    MultiContentEntryText(pos=(0, 0), size=(1000, 30), font=0,
+                                          text=get_translation("no_readers_defined"))
+                ])
+            else:
+                for rname in all_readers:
+                    if rname in active_map:
+                        reader = active_map[rname]
+                        status = reader['status']  # Connected / Unknown / NeedInit
+                        au = reader.get('au', '-')
+                        idle = reader.get('idle', '-')
+                        protocol = reader.get('protocol', '-')
+                    else:
+                        status = "OFF"
+                        au = idle = protocol = "-"
+
+                    # odredi ikonu
+                    status_lower = status.lower()
                     if status_lower == "connected":
                         icon_path = "/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/green.png"
                     elif status_lower in ["needinit", "unknown"]:
@@ -781,43 +911,36 @@ class CiefpOscamStatus(Screen):
                         icon_path = "/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/red.png"
 
                     entry = [
-                        (reader['name'], reader['status']),  # data tuple
+                        (rname, status),
                         MultiContentEntryPixmapAlphaTest(pos=(0, 7), size=(16, 16), png=loadPNG(icon_path)),
                         MultiContentEntryText(
                             pos=(30, 0), size=(1000, 30), font=0,
                             flags=RT_HALIGN_LEFT | RT_VALIGN_CENTER,
-                            text=f"{get_translation('reader')}: {reader['name']} | "
-                                 f"{get_translation('status')}: {reader['status']} | "
-                                 f"{get_translation('au')}: {reader['au']} | "
-                                 f"{get_translation('idle_time')}: {reader['idle']} | "
-                                 f"{get_translation('protocol')}: {reader['protocol']}"
+                            text=f"{get_translation('reader')}: {rname} | "
+                                 f"{get_translation('status')}: {status} | "
+                                 f"{get_translation('au')}: {au} | "
+                                 f"{get_translation('idle_time')}: {idle} | "
+                                 f"{get_translation('protocol')}: {protocol}"
                         )
                     ]
                     status_data.append(entry)
-            else:
-                status_data.append([
-                    ("", ""),
-                    MultiContentEntryText(pos=(0, 0), size=(1000, 30), font=0,
-                                          text=get_translation("no_status_data"))
-                ])
 
         except Exception as e:
             status_data.append([
                 ("", ""),
                 MultiContentEntryText(pos=(0, 0), size=(1000, 30), font=0,
-                                      text=get_translation("connection_error").format(f"{str(e)}"))
+                                      text=get_translation("connection_error").format(str(e)))
             ])
 
         self["status_list"].setList(status_data)
 
+    # --- ostale funkcije ostaju iste ---
     def toggleReader(self):
-        # Uzmemo trenutno selektovanu stavku iz MenuList-a
-        current = self["status_list"].getCurrent()  # MenuList -> getCurrent(), ne getSelection()
+        current = self["status_list"].getCurrent()
         if not current:
             self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
             return
 
-        # MultiContent format: prvi element je "data" koji si postavio kao (name, status)
         data = current[0] if isinstance(current, (list, tuple)) and len(current) > 0 else None
         if not (isinstance(data, (list, tuple)) and len(data) >= 2):
             self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
@@ -828,11 +951,8 @@ class CiefpOscamStatus(Screen):
             self.session.open(MessageBox, get_translation("no_reader_selected"), MessageBox.TYPE_ERROR, timeout=5)
             return
 
-        # OSCam label obično ne uključuje sufikse poput " (r)" ili " (p)"
         clean_name = reader_name.split(" (")[0]
-
         status_lower = (current_status or "").strip().lower()
-        # Sve što liči na OFF/grešku tretiramo kao kandidata za ENABLE
         should_enable = status_lower in ("off", "error", "disabled", "down", "stopped", "unknown", "needinit")
         action = "enable" if should_enable else "disable"
 
@@ -850,7 +970,6 @@ class CiefpOscamStatus(Screen):
                 if resp.getcode() == 200:
                     msg = f"Reader '{clean_name}' is {'ON' if action == 'enable' else 'OFF'}."
                     self.session.open(MessageBox, msg, MessageBox.TYPE_INFO, timeout=3)
-                    # odmah osveži listu (ako imaš timer auto-refresh, ovo je i dalje OK)
                     self.refreshStatus()
                 else:
                     raise Exception(f"HTTP {resp.getcode()}")
@@ -1402,6 +1521,7 @@ class CiefpOscamEditorMain(Screen):
             label_name = selected_name.replace(" ", "_").lower()
 
             try:
+                # Preuzmi C-line sa izabrane web stranice
                 html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
@@ -1412,6 +1532,7 @@ class CiefpOscamEditorMain(Screen):
                 password = re.sub(r'<.*?>', '', password)
                 password = unescape(password).strip()
 
+                # Kreiraj linije za novi reader
                 reader_lines = [
                     "[reader]",
                     f"label                         = {label_name}",
@@ -1430,6 +1551,7 @@ class CiefpOscamEditorMain(Screen):
                     "ccckeepalive                  = 1"
                 ]
 
+                # Odredi putanju oscam.server iz podešene dvbapi putanje
                 dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
                 server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
 
@@ -1437,8 +1559,13 @@ class CiefpOscamEditorMain(Screen):
                 with open(server_path, "a", encoding="utf-8") as f:
                     f.write("\n" + "\n".join(reader_lines) + "\n")
 
+                # Restartuj OSCam
                 restart_oscam()
 
+                # ⚡ Osveži listu readera odmah, da se novi reader prikaže
+                self.session.open(CiefpOscamStatus)
+
+                # Prikaži poruku o uspehu
                 self.session.open(
                     MessageBox,
                     f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
@@ -1449,6 +1576,7 @@ class CiefpOscamEditorMain(Screen):
             except Exception as e:
                 self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
 
+        # Lista izvora sa kojih se mogu preuzeti free readeri
         choices = [
             (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
             (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
@@ -1458,6 +1586,7 @@ class CiefpOscamEditorMain(Screen):
             (get_translation("cccamsate_free"), "https://cccamsate.com/free")
         ]
 
+        # Otvori ChoiceBox za izbor izvora
         self.session.openWithCallback(
             onSourceSelected,
             ChoiceBox,
@@ -1476,33 +1605,43 @@ class CiefpOscamEditorMain(Screen):
             "from": "N/A",
             "protocol": "N/A",
             "hops": "N/A",
-            "ecm_time": "N/A"
+            "ecm_time": "N/A",
+            "cw0": "N/A",
+            "cw1": "N/A"
         }
         if os.path.exists(ecm_path):
             try:
                 with open(ecm_path, "r") as f:
                     for line in f:
                         line = line.strip()
-                        if line.lower().startswith("caid:"):
-                            caid = line.split(":")[1].strip()
-                            caid = caid.replace("0x", "").upper()
-                            ecm_data["caid"] = caid
-                        elif line.lower().startswith("pid:"):
-                            ecm_data["pid"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("prov:"):
-                            ecm_data["prov"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("chid:"):
-                            ecm_data["chid"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("reader:"):
-                            ecm_data["reader"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("from:"):
-                            ecm_data["from"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("protocol:"):
-                            ecm_data["protocol"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("hops:"):
-                            ecm_data["hops"] = line.split(":")[1].strip()
-                        elif line.lower().startswith("ecm time:"):
-                            ecm_data["ecm_time"] = line.split(":")[1].strip()
+                        if ":" not in line:
+                            continue
+                        key, value = line.split(":", 1)
+                        key = key.strip().lower()
+                        value = value.strip()
+
+                        if key == "caid":
+                            ecm_data["caid"] = value.replace("0x", "").upper()
+                        elif key == "pid":
+                            ecm_data["pid"] = value
+                        elif key == "prov":
+                            ecm_data["prov"] = value
+                        elif key == "chid":
+                            ecm_data["chid"] = value
+                        elif key == "reader":
+                            ecm_data["reader"] = value
+                        elif key == "from":
+                            ecm_data["from"] = value
+                        elif key == "protocol":
+                            ecm_data["protocol"] = value
+                        elif key == "hops":
+                            ecm_data["hops"] = value
+                        elif key == "ecm time":
+                            ecm_data["ecm_time"] = value
+                        elif key == "cw0":
+                            ecm_data["cw0"] = value
+                        elif key == "cw1":
+                            ecm_data["cw1"] = value
             except Exception as e:
                 print(f"Error reading ecm.info: {str(e)}")
         return ecm_data
@@ -2028,6 +2167,7 @@ class CiefpOscamServerPreview(Screen):
     def deleteReader(self):
         self.session.openWithCallback(self.updateLines, CiefpOscamServerReaderSelect, self.lines)
 
+
     def addFreeReader(self):
         def onSourceSelected(selected):
             if not selected or not selected[1]:
@@ -2036,6 +2176,7 @@ class CiefpOscamServerPreview(Screen):
             label_name = selected_name.replace(" ", "_").lower()
 
             try:
+                # Preuzmi C-line sa izabrane web stranice
                 html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
@@ -2046,6 +2187,7 @@ class CiefpOscamServerPreview(Screen):
                 password = re.sub(r'<.*?>', '', password)
                 password = unescape(password).strip()
 
+                # Kreiraj linije za novi reader
                 reader_lines = [
                     "[reader]",
                     f"label                         = {label_name}",
@@ -2064,6 +2206,7 @@ class CiefpOscamServerPreview(Screen):
                     "ccckeepalive                  = 1"
                 ]
 
+                # Odredi putanju oscam.server iz podešene dvbapi putanje
                 dvbapi_path = config.plugins.CiefpOscamEditor.dvbapi_path.value
                 server_path = dvbapi_path.replace("oscam.dvbapi", "oscam.server")
 
@@ -2071,8 +2214,13 @@ class CiefpOscamServerPreview(Screen):
                 with open(server_path, "a", encoding="utf-8") as f:
                     f.write("\n" + "\n".join(reader_lines) + "\n")
 
+                # Restartuj OSCam
                 restart_oscam()
 
+                # ⚡ Osveži listu readera odmah, da se novi reader prikaže
+                self.session.open(CiefpOscamStatus)
+
+                # Prikaži poruku o uspehu
                 self.session.open(
                     MessageBox,
                     f"Reader '{label_name}' dodat iz '{selected_name}', Oscam reloadovan.",
@@ -2083,6 +2231,7 @@ class CiefpOscamServerPreview(Screen):
             except Exception as e:
                 self.session.open(MessageBox, f"Greška: {str(e)}", MessageBox.TYPE_ERROR, timeout=5)
 
+        # Lista izvora sa kojih se mogu preuzeti free readeri
         choices = [
             (get_translation("cccamia_free"), "https://cccamia.com/cccam-free"),
             (get_translation("cccam_premium"), "https://cccam-premium.pro/free-cccam"),
@@ -2092,6 +2241,7 @@ class CiefpOscamServerPreview(Screen):
             (get_translation("cccamsate_free"), "https://cccamsate.com/free")
         ]
 
+        # Otvori ChoiceBox za izbor izvora
         self.session.openWithCallback(
             onSourceSelected,
             ChoiceBox,
@@ -2961,7 +3111,7 @@ class CiefpOscamEcmInfo(Screen):
 
     def get_ecm_info(self):
         ecm_path = "/tmp/ecm.info"
-        info = {
+        ecm_data = {
             "caid": "N/A",
             "pid": "N/A",
             "prov": "000000",
@@ -2970,35 +3120,46 @@ class CiefpOscamEcmInfo(Screen):
             "from": "N/A",
             "protocol": "N/A",
             "hops": "N/A",
-            "ecm_time": "N/A"
+            "ecm_time": "N/A",
+            "cw0": "N/A",
+            "cw1": "N/A"
         }
         if os.path.exists(ecm_path):
             try:
                 with open(ecm_path, "r") as f:
                     for line in f:
                         line = line.strip()
-                        if line.lower().startswith("caid:"):
-                            caid = line.split(":", 1)[1].strip().replace("0x", "").upper()
-                            info["caid"] = caid
-                        elif line.lower().startswith("pid:"):
-                            info["pid"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("prov:"):
-                            info["prov"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("chid:"):
-                            info["chid"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("reader:"):
-                            info["reader"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("from:"):
-                            info["from"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("protocol:"):
-                            info["protocol"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("hops:"):
-                            info["hops"] = line.split(":", 1)[1].strip()
-                        elif line.lower().startswith("ecm time:"):
-                            info["ecm_time"] = line.split(":", 1)[1].strip()
+                        if ":" not in line:
+                            continue
+                        key, value = line.split(":", 1)
+                        key = key.strip().lower()
+                        value = value.strip()
+
+                        if key == "caid":
+                            ecm_data["caid"] = value.replace("0x", "").upper()
+                        elif key == "pid":
+                            ecm_data["pid"] = value
+                        elif key == "prov":
+                            ecm_data["prov"] = value
+                        elif key == "chid":
+                            ecm_data["chid"] = value
+                        elif key == "reader":
+                            ecm_data["reader"] = value
+                        elif key == "from":
+                            ecm_data["from"] = value
+                        elif key == "protocol":
+                            ecm_data["protocol"] = value
+                        elif key == "hops":
+                            ecm_data["hops"] = value
+                        elif key == "ecm time":
+                            ecm_data["ecm_time"] = value
+                        elif key == "cw0":
+                            ecm_data["cw0"] = value
+                        elif key == "cw1":
+                            ecm_data["cw1"] = value
             except Exception as e:
-                print(f"[CiefpOscamEditor] Greška pri čitanju ecm.info: {str(e)}")
-        return info
+                print(f"Error reading ecm.info: {str(e)}")
+        return ecm_data
 
 class CiefpOscamUserEditor(Screen, ConfigListScreen):
     skin = """<screen name="CiefpOscamUserEditor" position="center,center" size="1400,800" title="..:: OSCam User Editor ::..">
