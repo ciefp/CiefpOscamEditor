@@ -1,67 +1,67 @@
-# Ciefp Plugins Panel
+<div align="center">
 
-**Version:** `2.5`  
-**Author:** [@ciefp](https://github.com/ciefp)  
-**License:** Free for personal use  
-**Supported Languages:** English, Srpski, Slovenčina, Русский, Deutsch, Ελληνικά
+# Ciefp Oscam Editor
 
----
+**Advanced OSCam configuration editor for Enigma2 receivers**
 
-## 📖 Description
+![Version](https://img.shields.io/badge/Version-1.2.5-blue.svg?style=for-the-badge)
+![Enigma2](https://img.shields.io/badge/Enigma2-Compatible-green.svg?style=for-the-badge)
+![Languages](https://img.shields.io/badge/Languages-11-yellow.svg?style=for-the-badge)
 
-**Ciefp Plugins Panel** is a powerful and user-friendly Enigma2 plugin that serves as a central hub for installing and managing a collection of popular **Ciefp** utilities and tools. Designed for satellite receiver users (OpenPLi, OpenATV, VTI, etc.), this panel simplifies the installation of advanced features like EPG importers, IPTV bouquet managers, satellite editors, and more — all with a single click.
+<img src="https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/.github/logo.png" width="180" alt="Ciefp Oscam Editor Logo"/>
 
----
+**Edit `oscam.user`, `oscam.dvbapi`, `SoftCam.Key`, monitor WebIF, and manage BISS keys — all from your remote!**
 
-## ✨ Features
+[🇬🇧 English](#english) | [🇷🇸 Srpski](#srpski) | [🇭🇷 Hrvatski](#hrvatski) | [🇸🇰 Slovenčina](#slovenčina) | [🇬🇷 Ελληνικά](#ελληνικά) | [🇩🇪 Deutsch](#deutsch) | [🇵🇱 Polski](#polski) | [🇹🇷 Türkçe](#türkçe) | [🇪🇸 Español](#español) | [🇦🇪 العربية](#العربية) | [🇷🇸 Српски (ћирилица)](#српски-ћирилица)
 
-- **One-click installation** of 25+ Ciefp plugins
-- **Multilingual interface** (6 languages)
-- **Plugin descriptions** with localized text
-- **Image viewer** for plugin screenshots
-- **Auto-update system** with version checking
-- **Installed plugins tracking**
-- **Clean, modern GUI** with icons and scrollable descriptions
-- **Safe backup & restore** of installed plugins list during updates
+</div>
 
 ---
 
-## 🛠️ Supported Plugins (Examples)
+## English **Overview**
 
-| Plugin Name | Function |
-|------------|---------|
-| Ciefpsettings Motor | Motorized dish configuration |
-| Ciefp IPTV Bouquets | IPTV channel list management |
-| Ciefp EPGshare | EPG sharing between devices |
-| Ciefp OscamEditor | OSCam configuration editor |
-| Ciefp Satellite Analyzer | Signal analysis & transponder scanning |
-| Ciefp TvProgramSBB | TV guide for SBB (Serbia) |
-
-> Full list available in the plugin interface.
+**Ciefp Oscam Editor** is a powerful, user-friendly Enigma2 plugin designed for satellite receiver users who run **OSCam** (softcam). It allows full configuration editing directly from the TV screen using your remote control — no telnet or FTP required.
 
 ---
 
-## 🌍 Supported Languages
+## English **Key Features**
 
-The plugin automatically detects and loads descriptions in the selected language. Available languages:
-
-| Code | Language |
-|------|----------|
-| `en` | English |
-| `sr` | Srpski |
-| `sk` | Slovenčina |
-| `ru` | Русский |
-| `de` | Deutsch |
-| `el` | Ελληνικά |
-
-> Language files are located in:  
-> `/usr/lib/enigma2/python/Plugins/Extensions/CiefpPlugins/descriptions/<lang>/`
+| Feature | Description |
+|--------|-------------|
+| **Multi-Language UI** | 11 languages with full translation support |
+| **Config File Editors** | Edit `oscam.user`, `oscam.dvbapi`, `oscam.server` |
+| **SoftCam.Key Manager** | Add, delete, preview BISS keys |
+| **Auto Channel Detection** | SID & VPID auto-filled when adding BISS keys |
+| **WebIF Monitoring** | Live view of readers, users, entitlements |
+| **Smart Restart** | Image-specific OSCam restart (OpenATV, OpenPLi, Pure2, OpenViX, etc.) |
+| **Auto-Update** | Checks GitHub for new versions |
+| **Safe Path Handling** | Supports all common OSCam config locations |
+| **Preview Before Save** | See changes before applying |
 
 ---
 
-## 📥 Installation
+## English **Supported Languages**
 
-The plugin is installed via its own **installer script** from GitHub:
+| Language | Code | Script |
+|--------|------|--------|
+| English | `en` | Latin |
+| Srpski (latinica) | `sr_latn` | Latin |
+| Српски (ћирилица) | `sr_cyrl` | Cyrillic |
+| Hrvatski | `hr` | Latin |
+| Slovenčina | `sk` | Latin |
+| Ελληνικά | `el` | Greek |
+| العربية | `ar` | Arabic |
+| Deutsch | `de` | Latin |
+| Polski | `pl` | Latin |
+| Türkçe | `tr` | Latin |
+| Español | `es` | Latin |
+
+> Translation files:  
+> `/usr/lib/enigma2/python/Plugins/Extensions/CiefpOscamEditor/languages/<code>.py`
+
+---
+
+## English **Installation**
 
 ```bash
-wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpPlugins/main/installer.sh -O - | /bin/sh
+wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh
