@@ -8,7 +8,7 @@
 ![Enigma2](https://img.shields.io/badge/Enigma2-Compatible-green.svg?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/Languages-11-yellow.svg?style=for-the-badge)
 
-<img src="https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/.github/logo.png" width="200" alt="Ciefp Logo"/>
+<img src="https://github.com/ciefp/CiefpOscamEditor/blob/main/logo.jpg" width="200" alt="Ciefp Logo"/>
 
 **Jednostavan editor za OSCam fajlove: user, dvbapi, softcam.key, webif monitoring i više**
 
@@ -18,7 +18,7 @@
 
 ---
 
-## English **Features**
+**Features**
 
 | Feature | Description |
 |---------|-------------|
@@ -33,7 +33,7 @@
 
 ---
 
-## English **Installation**
+**Installation**
 
 ```bash
 wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh
@@ -43,7 +43,7 @@ wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOsca
 
 ---
 
-## English **Supported Languages**
+**Supported Languages**
 
 | Language | Code | Script |
 |----------|------|--------|
@@ -63,7 +63,7 @@ wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOsca
 
 ---
 
-## English **Usage**
+**Usage**
 
 - **Main Menu**: Access editors for user, dvbapi, softcam.key
 - **WebIF**: Monitor OSCam status (IP, user, password configurable)
@@ -73,20 +73,20 @@ wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOsca
 
 ---
 
-## English **Screenshots**
+**Screenshots**
 
 (Add screenshots here or link to images in repo)
 
 ---
 
-## English **Logging & Debugging**
+**Logging & Debugging**
 
 - Logs: Printed to console (telnet/SSH: `cat /tmp/oscam.log` if configured)
 - Errors: Handled with MessageBox popups
 
 ---
 
-## English **Auto-Update**
+**Auto-Update**
 
 - Current Version: 1.2.5
 - Update Command: Runs installer.sh on confirmation
@@ -95,63 +95,8 @@ wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOsca
 
 <div align="center">
 
-## Srpski **Ciefp Oscam Editor**
 
-**Editor za OSCam fajlove u Enigma2**
-
-</div>
-
----
-
-## Srpski **Šta nudi?**
-
-- Podrška za 11 jezika  
-- Editovanje oscam.user, dvbapi, SoftCam.Key  
-- Monitoring preko WebIF  
-- Dodavanje BISS ključeva za trenutni kanal  
-- Restart OSCam-a za sve image-ove  
-- Automatsko ažuriranje sa GitHub-a  
-
----
-
-## Srpski **Instalacija**
-
-```bash
-wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh
-```
-
-> Restartuj GUI ili risiver.
-
----
-
-## Srpski **Podržani jezici**
-
-- Srpski (latinica i ćirilica)  
-- English, Hrvatski, Slovak, Greek, Arabic, German, Polish, Turkish, Spanish
-
----
-
-## Srpski **Kako koristiti?**
-
-- Glavni meni: Odaberi editor  
-- Dodaj BISS: Automatski SID/VPID  
-- Sačuvaj i restartuj  
-
----
-
-<div align="center">
-
-## Hrvatski | Slovenčina | Ελληνικά | Deutsch | Polski | Türkçe | Español | العربية | Српски (ћирилица)
-
-> Prevedi i dodaj sekcije ako je potrebno. Pošalji Pull Request za nove jezike!
-
-</div>
-
----
-
-<div align="center">
-
-## English **Thanks for using Ciefp Oscam Editor!**
+**Thanks for using Ciefp Oscam Editor!**
 
 **@ciefp** • Serbia • 2025
 
