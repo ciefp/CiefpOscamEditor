@@ -75,7 +75,9 @@ wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOsca
 
 **Screenshots**
 
-(Add screenshots here or link to images in repo)
+![Main Menu](https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/screenshot1.jpg)
+![Functions](https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/screenshot2.jpg)
+![ADD Emulator](https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/screenshot3.jpg)
 
 ---
 
