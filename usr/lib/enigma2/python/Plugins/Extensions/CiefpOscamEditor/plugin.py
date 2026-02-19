@@ -562,7 +562,7 @@ config.plugins.CiefpOscamEditor.refresh_interval = ConfigSelection(default="5", 
 # Postojeće funkcije
 VERSION_URL = "https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/refs/heads/main/version.txt"
 UPDATE_COMMAND = 'wget -q --no-check-certificate https://raw.githubusercontent.com/ciefp/CiefpOscamEditor/main/installer.sh -O - | /bin/sh'
-PLUGIN_VERSION = "1.2.5"
+PLUGIN_VERSION = "1.2.6"
 
 def check_for_update(session):
     try:
@@ -961,10 +961,14 @@ class CiefpOscamStatus(Screen):
             encoded_reader_name = urllib.parse.quote(clean_name)
             url = f"http://{conf['ip']}:{conf['port']}/readers.html?label={encoded_reader_name}&action={action}"
 
-            req = urllib.request.Request(url)
+            # ⬇️ eksplicitno koristimo GET
+            req = urllib.request.Request(url, method="GET")
+
+            # ⬇️ proper Basic Auth
             if conf.get("user") and conf.get("pwd"):
-                auth_bytes = f"{conf['user']}:{conf['pwd']}".encode("utf-8")
-                req.add_header("Authorization", f"Basic {base64.b64encode(auth_bytes).decode('ascii')}")
+                credentials = f"{conf['user']}:{conf['pwd']}"
+                encoded = base64.b64encode(credentials.encode("utf-8")).decode("utf-8").strip()
+                req.add_header("Authorization", "Basic " + encoded)
 
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.getcode() == 200:
@@ -975,7 +979,8 @@ class CiefpOscamStatus(Screen):
                     raise Exception(f"HTTP {resp.getcode()}")
 
         except Exception as e:
-            self.session.open(MessageBox, f"Error when changing the state of the reader: {e}", MessageBox.TYPE_ERROR, timeout=5)
+            self.session.open(MessageBox, f"Error when changing the state of the reader: {e}", MessageBox.TYPE_ERROR,
+                              timeout=5)
 
     def openEcmInfo(self):
         self.session.open(CiefpOscamEcmInfo)
@@ -1522,7 +1527,12 @@ class CiefpOscamEditorMain(Screen):
 
             try:
                 # Preuzmi C-line sa izabrane web stranice
-                html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
+                req = urllib.request.Request(selected_url)
+                req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36")
+                req.add_header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                req.add_header("Accept-Language", "en-US,en;q=0.9")
+                req.add_header("Connection", "close")
+                html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
                     self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
@@ -2177,7 +2187,12 @@ class CiefpOscamServerPreview(Screen):
 
             try:
                 # Preuzmi C-line sa izabrane web stranice
-                html = urllib.request.urlopen(selected_url, timeout=5).read().decode("utf-8", errors="ignore")
+                req = urllib.request.Request(selected_url)
+                req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36")
+                req.add_header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                req.add_header("Accept-Language", "en-US,en;q=0.9")
+                req.add_header("Connection", "close")
+                html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="ignore")
                 match = re.search(r'C:\s*([\w\.-]+)\s+(\d+)\s+(\w+)\s+([^<\s]+)', html)
                 if not match:
                     self.session.open(MessageBox, "C-line nije pronađena!", MessageBox.TYPE_ERROR, timeout=5)
